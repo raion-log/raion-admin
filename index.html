@@ -186,6 +186,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="ext">확장프로그램</button>
       <button class="tab" data-tab="uvengers">유벤져스</button>
+      <button class="tab" data-tab="editor">UV 에디터</button>
     </div>
 
     <!-- 사용자 관리 탭 -->
@@ -554,6 +555,74 @@
     </div>
   </div>
 
+  <!-- ========== UV 에디터 탭 (uv-global-reaction-editor 앱 회원) ========== -->
+  <div id="tab-editor" class="hidden">
+    <div class="subtabs">
+      <button class="subtab active" data-group="editor" data-subtab="editor-members">회원 승인</button>
+      <button class="subtab" data-group="editor" data-subtab="editor-codes">추천코드</button>
+    </div>
+
+    <div id="sub-editor-members">
+      <!-- 승인 대기 -->
+      <div class="card">
+        <h3>가입 승인 대기 (<span id="ed-pending-count">0</span>)</h3>
+        <div style="margin-bottom:10px;">
+          <button class="btn btn-small btn-outline" onclick="loadEditorMembers()">새로고침</button>
+        </div>
+        <table>
+          <thead><tr>
+            <th>이메일</th><th>성함</th><th>연락처끝4</th><th>기수</th><th>유입</th><th>가입일</th><th>승인</th>
+          </tr></thead>
+          <tbody id="ed-pending-body"></tbody>
+        </table>
+        <div id="ed-pending-empty" class="empty hidden">승인 대기 중인 가입자가 없습니다.</div>
+      </div>
+
+      <!-- 승인된 회원 -->
+      <div class="card">
+        <h3>승인된 에디터 회원 (<span id="ed-member-count">0</span>)</h3>
+        <div class="search-bar">
+          <input type="text" id="ed-member-search" placeholder="이메일, 성함으로 검색..." oninput="renderEditorMembers()">
+        </div>
+        <table>
+          <thead><tr>
+            <th>이메일</th><th>성함</th><th>기수</th><th>유형</th><th>상태</th>
+            <th>시작일</th><th>유효기간 / 연장</th><th>기기수</th><th>기기</th><th>관리</th>
+          </tr></thead>
+          <tbody id="ed-member-body"></tbody>
+        </table>
+        <div id="ed-member-empty" class="empty hidden">승인된 회원이 없습니다.</div>
+      </div>
+    </div>
+
+    <div id="sub-editor-codes" class="hidden">
+      <div class="card">
+        <h3>추천 / 이벤트 코드</h3>
+        <p style="color:var(--text3);font-size:13px;margin-bottom:12px;">
+          코드로 가입하면 그 유형(구독·이벤트 등)으로 자동 분류됩니다. 승인은 여전히 직접 하셔야 합니다.</p>
+        <div class="form-row" style="align-items:flex-end;gap:10px;margin-bottom:14px;">
+          <div class="form-group flex-1"><label>코드</label>
+            <input type="text" id="ed-code-new" placeholder="예: SUMMER2026"></div>
+          <div class="form-group"><label>유형</label>
+            <select id="ed-code-type" style="padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <option value="event">이벤트</option>
+              <option value="subscription">구독</option>
+              <option value="staff">내부</option>
+              <option value="student">수강생</option>
+            </select></div>
+          <div class="form-group flex-1"><label>메모</label>
+            <input type="text" id="ed-code-memo" placeholder="선택사항"></div>
+          <button class="btn btn-primary" onclick="addEditorCode()">코드 추가</button>
+        </div>
+        <table>
+          <thead><tr><th>코드</th><th>유형</th><th>메모</th><th>활성</th><th>관리</th></tr></thead>
+          <tbody id="ed-code-body"></tbody>
+        </table>
+        <div id="ed-code-empty" class="empty hidden">등록된 코드가 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script>
@@ -639,11 +708,17 @@
         showSubTab(active ? active.dataset.subtab : 'ext-license');
       },
       uvengers: () => { loadUvInquiries(); loadUvMembers(); },
+      editor: () => {
+        const active = document.querySelector('.subtab[data-group="editor"].active');
+        showSubTab(active ? active.dataset.subtab : 'editor-members');
+      },
     };
 
     const SUBTAB_LOADERS = {
       'ext-license':  () => loadUsers(),
       'ext-sessions': () => loadSessions(),
+      'editor-members': () => loadEditorMembers(),
+      'editor-codes':   () => loadEditorCodes(),
     };
 
     function showTab(name) {
@@ -1759,6 +1834,198 @@
     sb.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) checkAdmin(session);
     });
+
+    // ========== UV 에디터 (uv-global-reaction-editor 앱 회원) ==========
+    // 테이블: uvengers_editor_members / _devices / _codes. 헬퍼만 사용, editor_is_admin() 정책 의존.
+    let editorMembers = [];
+    let editorDevices = [];
+    let editorCodes = [];
+    function edInput() { return "padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;"; }
+    function edEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    async function loadEditorMembers() {
+      try {
+        editorMembers = await supabaseGet('uvengers_editor_members', 'order=created_at.desc');
+        editorDevices = await supabaseGet('uvengers_editor_devices', 'order=last_seen.desc');
+        renderEditorPending();
+        renderEditorMembers();
+      } catch (e) { toast('에디터 회원 로드 실패: ' + e.message, 'error'); }
+    }
+
+    function edTypeBadge(m) {
+      const t = m.member_type;
+      if (!t || t === 'student') return '';
+      const map = { subscription:['구독','badge-active'], event:['이벤트','badge-registered'], staff:['내부','badge-expired'] };
+      const [label, cls] = map[t] || [t, 'badge-registered'];
+      const code = m.referral_code ? ' ' + edEsc(m.referral_code) : '';
+      return `<span class="badge ${cls}" style="font-size:10px;">${label}${code}</span>`;
+    }
+    function edKstEndOfDay(d) {
+      const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+      return kst.toISOString().slice(0, 10) + 'T23:59:59+09:00';
+    }
+    function edAddPeriod(base, amount, unit) {
+      const d = new Date(base.getTime());
+      if (unit === 'days') d.setDate(d.getDate() + amount);
+      else if (unit === 'weeks') d.setDate(d.getDate() + amount * 7);
+      else d.setMonth(d.getMonth() + amount);
+      return edKstEndOfDay(d);
+    }
+
+    function renderEditorPending() {
+      const pending = editorMembers.filter(m => m.status === 'pending');
+      document.getElementById('ed-pending-count').textContent = pending.length;
+      const tbody = document.getElementById('ed-pending-body');
+      const empty = document.getElementById('ed-pending-empty');
+      if (!pending.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+      const st = edInput();
+      tbody.innerHTML = pending.map(m => {
+        const created = m.created_at ? new Date(m.created_at).toLocaleDateString('ko-KR') : '-';
+        return `<tr>
+          <td style="font-size:12px;">${edEsc(m.email)}</td>
+          <td>${edEsc(m.name || '-')}</td>
+          <td>${edEsc(m.phone_last4 || '-')}</td>
+          <td>${edEsc(m.cohort || '-')}</td>
+          <td>${edTypeBadge(m) || '<span style="font-size:11px;color:var(--text3);">-</span>'}</td>
+          <td>${created}</td>
+          <td class="actions" style="white-space:nowrap;">
+            <input type="number" id="ed-dur-${m.id}" value="1" min="1" style="${st}width:44px;text-align:center;">
+            <select id="ed-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
+            <button class="btn btn-small btn-primary" onclick="approveEditorMember('${m.id}')">승인</button>
+            <button class="btn btn-small btn-danger" onclick="updateEditorMember('${m.id}', { status: 'blocked' })">거부</button>
+          </td></tr>`;
+      }).join('');
+    }
+
+    function renderEditorMembers() {
+      const search = (document.getElementById('ed-member-search').value || '').toLowerCase();
+      const approved = editorMembers.filter(m => m.status !== 'pending');
+      const filtered = approved.filter(m => !search || (m.email||'').toLowerCase().includes(search) || (m.name||'').toLowerCase().includes(search));
+      document.getElementById('ed-member-count').textContent = approved.length;
+      const tbody = document.getElementById('ed-member-body');
+      const empty = document.getElementById('ed-member-empty');
+      if (!filtered.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+      const st = edInput();
+      tbody.innerHTML = filtered.map(m => {
+        const statusClass = m.status === 'approved' ? 'badge-active' : 'badge-revoked';
+        const statusText = m.status === 'approved' ? '승인' : '차단';
+        const vuDate = m.valid_until ? String(m.valid_until).slice(0,10) : '';
+        const startDate = m.started_at ? new Date(m.started_at).toLocaleDateString('ko-KR') : '-';
+        const typeBadge = edTypeBadge(m) || '<span style="font-size:11px;color:var(--text3);">수강생</span>';
+        let vuNote = '';
+        if (m.valid_until) {
+          const days = Math.ceil((new Date(m.valid_until) - new Date()) / 86400000);
+          if (days < 0) vuNote = '<span style="color:var(--red);font-size:11px;">만료됨</span>';
+          else if (days <= 7) vuNote = `<span style="color:var(--red);font-size:11px;">${days}일 남음</span>`;
+          else vuNote = `<span style="color:var(--text3);font-size:11px;">${days}일 남음</span>`;
+        }
+        const devs = editorDevices.filter(d => d.member_id === m.id);
+        const devList = devs.length ? devs.map(d => {
+          const seen = d.last_seen ? new Date(d.last_seen).toLocaleDateString('ko-KR') : '-';
+          const label = edEsc(d.device_label || d.device_uuid.slice(0,8));
+          return `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;"><span style="font-size:11px;color:var(--text3);">${label} (${seen})</span><button class="btn btn-small btn-outline" style="padding:1px 6px;font-size:10px;" onclick="removeEditorDevice('${d.id}')">해제</button></div>`;
+        }).join('') : '<span style="font-size:11px;color:var(--text3);">없음</span>';
+        return `<tr>
+          <td style="font-size:12px;">${edEsc(m.email)}</td>
+          <td>${edEsc(m.name || '-')}</td>
+          <td>${edEsc(m.cohort || '-')}</td>
+          <td>${typeBadge}</td>
+          <td><span class="badge ${statusClass}">${statusText}</span></td>
+          <td style="font-size:11px;color:var(--text3);">${startDate}</td>
+          <td>
+            <input type="date" value="${vuDate}" style="${st}" onchange="setEditorValidUntil('${m.id}', this.value)"><br>${vuNote}
+            <div style="display:flex;gap:2px;margin-top:3px;align-items:center;">
+              <input type="number" id="ed-ext-dur-${m.id}" value="1" min="1" style="${st}width:38px;text-align:center;">
+              <select id="ed-ext-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
+              <button class="btn btn-small btn-outline" style="padding:2px 6px;font-size:10px;" onclick="extendEditorMember('${m.id}')">연장</button>
+            </div></td>
+          <td><input type="number" value="${m.max_devices ?? 2}" min="1" max="10" style="${st}width:48px;text-align:center;" onchange="updateEditorMember('${m.id}', { max_devices: parseInt(this.value) })"></td>
+          <td>${devList}</td>
+          <td class="actions"><button class="btn btn-small ${m.status === 'approved' ? 'btn-danger' : 'btn-primary'}" onclick="updateEditorMember('${m.id}', { status: '${m.status === 'approved' ? 'blocked' : 'approved'}' })">${m.status === 'approved' ? '차단' : '승인'}</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function approveEditorMember(id) {
+      const amount = parseInt((document.getElementById('ed-dur-'+id)||{}).value) || 1;
+      const unit = (document.getElementById('ed-unit-'+id)||{}).value || 'months';
+      const now = new Date();
+      await updateEditorMember(id, { status:'approved', started_at: now.toISOString(), valid_until: edAddPeriod(now, amount, unit) });
+    }
+    async function extendEditorMember(id) {
+      const m = editorMembers.find(x => x.id === id);
+      const amount = parseInt((document.getElementById('ed-ext-dur-'+id)||{}).value) || 1;
+      const unit = (document.getElementById('ed-ext-unit-'+id)||{}).value || 'months';
+      const base = (m && m.valid_until && new Date(m.valid_until) > new Date()) ? new Date(m.valid_until) : new Date();
+      await updateEditorMember(id, { valid_until: edAddPeriod(base, amount, unit) });
+    }
+    async function setEditorValidUntil(id, dateStr) {
+      await updateEditorMember(id, { valid_until: dateStr ? dateStr + 'T23:59:59+09:00' : null });
+    }
+    async function updateEditorMember(id, updates) {
+      try {
+        const res = await supabasePatch('uvengers_editor_members', id, updates);
+        if (!Array.isArray(res) || res.length === 0) { toast('변경이 적용되지 않았습니다(권한 확인)', 'error'); return; }
+        toast('적용됨', 'success');
+        await loadEditorMembers();
+      } catch (e) { toast('수정 실패: ' + e.message, 'error'); }
+    }
+    async function removeEditorDevice(deviceId) {
+      if (!confirm('이 기기를 해제할까요? 해당 PC 는 다시 등록해야 합니다.')) return;
+      try { await supabaseDelete('uvengers_editor_devices', 'id=eq.' + deviceId); toast('기기 해제됨','success'); await loadEditorMembers(); }
+      catch (e) { toast('기기 해제 실패: ' + e.message, 'error'); }
+    }
+
+    // ── 추천/이벤트 코드 ──
+    async function loadEditorCodes() {
+      try { editorCodes = await supabaseGet('uvengers_editor_codes', 'order=created_at.desc'); renderEditorCodes(); }
+      catch (e) { toast('코드 로드 실패: ' + e.message, 'error'); }
+    }
+    function renderEditorCodes() {
+      const tbody = document.getElementById('ed-code-body');
+      const empty = document.getElementById('ed-code-empty');
+      if (!editorCodes.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+      const st = edInput();
+      const typeLabel = { subscription:'구독', event:'이벤트', staff:'내부', student:'수강생' };
+      tbody.innerHTML = editorCodes.map(c => `<tr>
+        <td style="font-weight:600;">${edEsc(c.code)}</td>
+        <td>${typeLabel[c.member_type] || edEsc(c.member_type)}</td>
+        <td><input type="text" value="${edEsc(c.memo || '')}" style="${st}width:160px;" onchange="updateEditorCode('${edEsc(c.code)}', { memo: this.value })"></td>
+        <td><button class="btn btn-small ${c.active ? 'btn-primary' : 'btn-outline'}" onclick="updateEditorCode('${edEsc(c.code)}', { active: ${!c.active} })">${c.active ? '활성' : '비활성'}</button></td>
+        <td class="actions"><button class="btn btn-small btn-danger" onclick="deleteEditorCode('${edEsc(c.code)}')">삭제</button></td>
+      </tr>`).join('');
+    }
+    async function addEditorCode() {
+      const code = document.getElementById('ed-code-new').value.trim();
+      const member_type = document.getElementById('ed-code-type').value;
+      const memo = document.getElementById('ed-code-memo').value.trim();
+      if (!code) { toast('코드를 입력하세요', 'error'); return; }
+      try {
+        await supabasePost('uvengers_editor_codes', { code, member_type, memo: memo || null, active: true });
+        toast('코드 추가됨', 'success');
+        document.getElementById('ed-code-new').value = '';
+        document.getElementById('ed-code-memo').value = '';
+        await loadEditorCodes();
+      } catch (e) { toast('코드 추가 실패: ' + e.message, 'error'); }
+    }
+    async function updateEditorCode(code, updates) {
+      try {
+        // codes 는 PK 가 code — supabasePatch 는 id 기준이라 직접 쿼리로 code 매칭.
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_editor_codes?code=eq.${encodeURIComponent(code)}`, {
+          method: 'PATCH', headers: { ...apiHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(updates) });
+        const body = await res.json();
+        if (!Array.isArray(body) || body.length === 0) { toast('변경 안 됨(권한 확인)', 'error'); return; }
+        toast('적용됨', 'success'); await loadEditorCodes();
+      } catch (e) { toast('수정 실패: ' + e.message, 'error'); }
+    }
+    async function deleteEditorCode(code) {
+      if (!confirm(`코드 '${code}' 를 삭제할까요?`)) return;
+      try { await supabaseDelete('uvengers_editor_codes', 'code=eq.' + encodeURIComponent(code)); toast('삭제됨','success'); await loadEditorCodes(); }
+      catch (e) { toast('삭제 실패: ' + e.message, 'error'); }
+    }
 
     (async function boot() {
       const { data: { session } } = await sb.auth.getSession();
