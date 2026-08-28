@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAION Admin</title>
+  <link rel="icon" href="favicon.ico" sizes="32x32">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a; --bg2: #111; --bg3: #1a1a1a; --bg-card: #151515;
+      --text: #e8e8e8; --text2: #b0b0b0; --text3: #707070;
+      --border: #2a2a2a; --accent: #FFD700; --accent-hover: #FFC000;
+      --red: #e94560; --green: #27ae60; --blue: #3498db;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .container { max-width: 1600px; margin: 0 auto; padding: 24px; width: 98%; }
+
+    /* 헤더 */
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    header h1 { font-size: 26px; }
+    header h1 span:first-child { font-weight: 800; background: linear-gradient(135deg, #FFD700, #FFA500, #FFD700, #FFEC8B); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: goldShimmer 2s ease-in-out infinite; text-shadow: 0 0 20px rgba(255,215,0,0.3); filter: drop-shadow(0 0 6px rgba(255,215,0,0.4)); }
+    @keyframes goldShimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    header h1 span:last-child { color: var(--text2); font-weight: 400; }
+    .connection-status { font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); }
+    .status-dot.connected { background: var(--green); }
+
+    /* 탭 */
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+    .tab { padding: 10px 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); cursor: pointer; font-size: 14px; transition: all 0.2s; }
+    .tab:hover { background: var(--bg3); }
+    .tab.active { background: var(--accent); color: #000; font-weight: 600; border-color: var(--accent); }
+
+    /* 카드 */
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .card h3 { font-size: 16px; margin-bottom: 16px; color: var(--accent); }
+
+    /* 폼 */
+    .form-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: end; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 12px; color: var(--text3); text-transform: uppercase; }
+    .form-group input, .form-group select, .form-group textarea { padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
+    .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+    .checkbox-group { display: flex; gap: 12px; flex-wrap: wrap; }
+    .checkbox-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text2); cursor: pointer; }
+    .checkbox-group input[type="checkbox"] { accent-color: var(--accent); }
+
+    /* 버튼 */
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-small { padding: 6px 12px; font-size: 12px; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+    .btn-outline:hover { border-color: var(--text2); color: var(--text); }
+
+    /* 테이블 */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 12px; color: var(--text3); text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    tr:hover td { background: rgba(255,215,0,0.03); }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-active { background: rgba(39,174,96,0.15); color: var(--green); }
+    .badge-revoked { background: rgba(233,69,96,0.15); color: var(--red); }
+    .badge-expired { background: rgba(150,150,150,0.15); color: #999; }
+    .badge-kicked { background: rgba(255,152,0,0.15); color: #ff9800; }
+    .badge-registered { background: rgba(150,150,150,0.1); color: #666; }
+    .ext-tag { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; margin: 1px 2px; }
+    .ext-tag-grok-pro { background: rgba(255,215,0,0.15); color: #FFD700; border: 1px solid rgba(255,215,0,0.3); }
+    .ext-tag-genspark-pro { background: rgba(192,192,192,0.15); color: #C0C0C0; border: 1px solid rgba(192,192,192,0.3); }
+    .ext-tag-flow-pro { background: rgba(139,195,74,0.15); color: #b4e870; border: 1px solid rgba(139,195,74,0.35); }
+    .ext-tag-genspark-hub { background: rgba(155,89,182,0.15); color: #9b59b6; border: 1px solid rgba(155,89,182,0.3); }
+    .ext-tag-jp-eco { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+    .actions { display: flex; gap: 6px; }
+
+    /* 세션 */
+    .session-info { font-size: 12px; color: var(--text3); }
+    .session-ext { color: var(--blue); }
+
+    /* 빈 상태 */
+    .empty { text-align: center; padding: 40px; color: var(--text3); }
+
+    /* 검색 */
+    .search-bar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; }
+    .search-bar input { flex: 1; padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
+    .search-bar input:focus { border-color: var(--accent); }
+    .search-bar select { padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; }
+
+    /* 정렬 가능 헤더 */
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { color: var(--accent); }
+    th.sortable::after { content: ' ⇅'; font-size: 10px; opacity: 0.4; }
+    th.sortable.asc::after { content: ' ▲'; opacity: 1; color: var(--accent); }
+    th.sortable.desc::after { content: ' ▼'; opacity: 1; color: var(--accent); }
+
+    /* 알림 */
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 1000; animation: slideIn 0.3s ease; }
+    .toast-success { background: var(--green); color: #fff; }
+    .toast-error { background: var(--red); color: #fff; }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* 모달 */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 90%; max-width: 460px; }
+    .modal h3 { margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+    .hidden { display: none !important; }
+
+    /* 로그인 게이트 */
+    .gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .gate-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 40px 36px; width: min(420px, 90vw); text-align: center; }
+    .gate-box h1 { font-size: 28px; margin-bottom: 8px; }
+    .gate-box h1 span:first-child { font-weight: 800; background: linear-gradient(135deg, #FFD700, #FFA500, #FFD700, #FFEC8B); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: goldShimmer 2s ease-in-out infinite; }
+    .gate-box h1 span:last-child { color: var(--text2); font-weight: 400; }
+    .gate-sub { color: var(--text3); font-size: 13px; margin-bottom: 28px; line-height: 1.6; }
+    .gate-btn { width: 100%; padding: 13px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: #1f1f1f; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all .2s; }
+    .gate-btn:hover { background: #f1f1f1; }
+    .gate-msg { margin-top: 18px; font-size: 13px; line-height: 1.6; min-height: 20px; }
+    .gate-msg.err { color: var(--red); }
+    .gate-msg.info { color: var(--text3); }
+    .gate-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--text3); font-size: 12px; }
+    .gate-divider::before, .gate-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .gate-form { display: flex; flex-direction: column; gap: 10px; }
+    .gate-form input { padding: 12px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 14px; outline: none; }
+    .gate-form input:focus { border-color: var(--accent); }
+    .gate-form button { padding: 12px; border-radius: 10px; border: none; background: var(--accent); color: #000; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .gate-form button:hover { background: var(--accent-hover); }
+    .gate-form button:disabled { opacity: .5; cursor: default; }
+    .gate-link { margin-top: 14px; }
+    .gate-link button { background: none; border: none; color: var(--text3); font-size: 12px; text-decoration: underline; cursor: pointer; }
+    .admin-badge { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text3); }
+    .admin-badge b { color: var(--accent); font-weight: 600; }
+    .flex-1 { flex: 1; }
+  </style>
+</head>
+<body>
+  <!-- 로그인 게이트: 인증 + 관리자 확인 전까지 본문은 렌더되지 않는다 -->
+  <div class="gate" id="auth-gate">
+    <div class="gate-box">
+      <h1><span>RAION</span> <span>Admin</span></h1>
+      <p class="gate-sub">관리자 전용입니다.<br>등록된 관리자 계정으로 로그인하세요.</p>
+      <button class="gate-btn" id="gate-login">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        구글로 로그인
+      </button>
+      <div class="gate-divider">또는</div>
+      <form class="gate-form" id="gate-pw-form">
+        <input type="email" id="gate-email" placeholder="이메일" autocomplete="username" required>
+        <input type="password" id="gate-password" placeholder="비밀번호" autocomplete="current-password" required>
+        <button type="submit" id="gate-pw-submit">이메일로 로그인</button>
+      </form>
+      <div class="gate-link"><button type="button" id="gate-forgot">비밀번호를 잊으셨나요?</button></div>
+      <div class="gate-msg info" id="gate-msg"></div>
+      <div class="gate-link hidden" id="gate-logout-wrap"><button id="gate-logout">다른 계정으로 로그인</button></div>
+    </div>
+  </div>
+
+  <div class="container hidden" id="app-root">
+    <header>
+      <h1><span>RAION</span> <span>Admin</span></h1>
+      <div class="admin-badge">
+        <span>관리자 <b id="admin-email">-</b></span>
+        <button class="btn btn-outline btn-small" id="btn-logout">로그아웃</button>
+        <span class="connection-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="connection-text">연결 확인 중...</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- 탭 -->
+    <div class="tabs">
+      <button class="tab active" data-tab="users">사용자 관리</button>
+      <button class="tab" data-tab="sessions">활성 세션</button>
+      <button class="tab" data-tab="uvengers">유벤져스</button>
+    </div>
+
+    <!-- 사용자 관리 탭 -->
+    <div id="tab-users">
+      <!-- 사용자 추가 -->
+      <div class="card">
+        <h3>사용자 추가</h3>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>이메일</label>
+            <input type="email" id="add-email" placeholder="user@gmail.com">
+          </div>
+          <div class="form-group">
+            <label>기수</label>
+            <input type="text" id="add-cohort" placeholder="예: 1기" style="width: 80px;">
+          </div>
+          <div class="form-group">
+            <label>메모</label>
+            <input type="text" id="add-memo" placeholder="선택사항">
+          </div>
+          <div class="form-group">
+            <label>동시접속</label>
+            <input type="number" id="add-max-sessions" value="1" min="0" style="width: 70px;" title="0 = 무제한">
+          </div>
+          <button class="btn btn-primary" id="add-user-btn">추가</button>
+        </div>
+        <div class="form-group" style="margin-top: 4px;">
+          <label>허용 확장프로그램</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" value="grok-pro" checked> Grok Pro</label>
+            <label><input type="checkbox" value="genspark-pro" checked> Genspark Pro</label>
+            <label><input type="checkbox" value="genspark-hub" checked> Genspark Hub</label>
+            <label><input type="checkbox" value="flow-pro" checked> Flow Pro</label>
+            <label><input type="checkbox" value="jp-eco" checked> JP Eco</label>
+          </div>
+        </div>
+        <div style="margin-top: 4px; font-size: 11px; color: var(--text3);">동시접속: 1 = 1기기만 허용 (기본), 0 = 무제한</div>
+      </div>
+
+      <!-- 대량 등록 -->
+      <div class="card">
+        <h3>대량 등록 (Excel)</h3>
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-outline" id="download-template" style="gap: 8px;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v10M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            템플릿 다운로드
+          </button>
+          <label class="btn btn-outline" style="cursor: pointer; gap: 8px;" id="upload-label">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 11V1M4 5l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Excel 업로드
+            <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display: none;">
+          </label>
+          <span id="upload-status" style="font-size: 13px; color: var(--text3);"></span>
+        </div>
+        <div id="bulk-preview" class="hidden" style="margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 13px; color: var(--text2);">미리보기 (<span id="bulk-count">0</span>명)</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-small btn-outline" id="bulk-cancel">취소</button>
+              <button class="btn btn-small btn-primary" id="bulk-submit">일괄 등록</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>이메일</th>
+                <th>확장프로그램</th>
+                <th>동시접속</th>
+                <th>기수</th>
+                <th>메모</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody id="bulk-list"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 등록 결과 -->
+      <div class="card hidden" id="bulk-result">
+        <h3 id="bulk-result-title" style="margin-bottom: 12px;"></h3>
+        <div id="bulk-result-list" style="font-size: 13px; line-height: 1.8; color: var(--text2);"></div>
+        <button class="btn btn-small btn-outline" style="margin-top: 12px;" onclick="document.getElementById('bulk-result').classList.add('hidden')">닫기</button>
+      </div>
+
+      <!-- 사용자 목록 -->
+      <div class="card">
+        <h3>사용자 목록 (<span id="user-count">0</span>)</h3>
+        <div class="search-bar">
+          <input type="text" id="user-search" placeholder="이메일, 메모, 확장프로그램으로 검색...">
+          <select id="status-filter">
+            <option value="">전체 상태</option>
+            <option value="active">Active</option>
+            <option value="revoked">Revoked</option>
+          </select>
+        </div>
+        <!-- 일괄 수정 바 -->
+        <div class="hidden" id="bulk-edit-bar" style="display: none; padding: 12px; background: var(--bg3); border: 1px solid var(--accent); border-radius: 8px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <span style="font-size: 13px; color: var(--accent); font-weight: 600;"><span id="bulk-selected-count">0</span>명 선택</span>
+          <div class="checkbox-group" id="bulk-edit-extensions" style="margin-left: 8px;">
+            <label><input type="checkbox" value="grok-pro"> Grok Pro</label>
+            <label><input type="checkbox" value="genspark-pro"> Genspark Pro</label>
+            <label><input type="checkbox" value="genspark-hub"> Genspark Hub</label>
+            <label><input type="checkbox" value="flow-pro"> Flow Pro</label>
+            <label><input type="checkbox" value="jp-eco"> JP Eco</label>
+          </div>
+          <input type="number" id="bulk-edit-sessions" placeholder="동시접속" min="0" style="width: 80px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
+          <input type="text" id="bulk-edit-cohort" placeholder="기수" style="width: 80px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
+          <button class="btn btn-small btn-primary" id="bulk-edit-apply">일괄 적용</button>
+          <button class="btn btn-small btn-outline" id="bulk-edit-cancel">취소</button>
+        </div>
+        <table style="table-layout: fixed; width: 100%;">
+          <colgroup>
+            <col style="width: 28px;">
+            <col style="width: 22%;">
+            <col style="width: 24%;">
+            <col style="width: 7%;">
+            <col style="width: 7%;">
+            <col style="width: 8%;">
+            <col style="width: 10%;">
+            <col style="width: 14%;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="select-all-users"></th>
+              <th class="sortable" data-sort="email">이메일</th>
+              <th>허용 확장프로그램</th>
+              <th class="sortable" data-sort="max_sessions">동시접속</th>
+              <th class="sortable" data-sort="status">상태</th>
+              <th class="sortable" data-sort="cohort">기수</th>
+              <th class="sortable" data-sort="memo">메모</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="user-list">
+            <tr><td colspan="6" class="empty">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 세션 탭 -->
+    <div id="tab-sessions" class="hidden">
+      <div class="card">
+        <h3>세션 이력 (<span id="session-count">0</span>)</h3>
+        <div class="search-bar">
+          <input type="text" id="session-search" placeholder="이메일로 검색...">
+          <select id="session-ext-filter">
+            <option value="">전체 확장프로그램</option>
+            <option value="grok-pro">Grok Pro</option>
+            <option value="genspark-pro">Genspark Pro</option>
+            <option value="genspark-hub">Genspark Hub</option>
+            <option value="flow-pro">Flow Pro</option>
+            <option value="jp-eco">JP Eco</option>
+          </select>
+          <select id="session-status-filter">
+            <option value="">전체 상태</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="kicked">Kicked</option>
+            <option value="registered">Registered</option>
+          </select>
+        </div>
+        <table style="table-layout: fixed; width: 100%;">
+          <colgroup>
+            <col style="width: 18%;">
+            <col style="width: 22%;">
+            <col style="width: 22%;">
+            <col style="width: 8%;">
+            <col style="width: 8%;">
+            <col style="width: 12%;">
+            <col style="width: 10%;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="sortable" data-session-sort="user_email">이메일</th>
+              <th>허용 확장프로그램</th>
+              <th>활성 중</th>
+              <th class="sortable" data-session-sort="cohort">기수</th>
+              <th class="sortable" data-session-sort="memo">메모</th>
+              <th class="sortable" data-session-sort="last_active">마지막 활동</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="session-list">
+            <tr><td colspan="7" class="empty">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 유벤져스 가입 신청 관리 탭 -->
+    <div id="tab-uvengers" class="hidden">
+      <!-- 직접 추가 폼 -->
+      <div class="card">
+        <h3>신청 직접 추가</h3>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>이름</label>
+            <input type="text" id="uv-add-name" placeholder="홍길동">
+          </div>
+          <div class="form-group flex-1">
+            <label>연락처</label>
+            <input type="text" id="uv-add-phone" placeholder="01012345678">
+          </div>
+          <div class="form-group flex-1">
+            <label>이메일</label>
+            <input type="email" id="uv-add-email" placeholder="user@gmail.com">
+          </div>
+          <div class="form-group">
+            <label>기수</label>
+            <select id="uv-add-batch">
+              <option value="유벤져스 1기">1기</option>
+              <option value="유벤져스 2기">2기</option>
+              <option value="관리자">관리자</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>상태</label>
+            <select id="uv-add-status">
+              <option value="pending">대기</option>
+              <option value="approved">승인</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>비고</label>
+            <input type="text" id="uv-add-notes" placeholder="선택사항">
+          </div>
+          <button class="btn btn-primary" onclick="addUvInquiry()">추가</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>유벤져스 가입 신청 (<span id="uv-count">0</span>)</h3>
+        <div class="search-bar">
+          <input type="text" id="uv-search" placeholder="이름, 이메일, 연락처로 검색...">
+          <select id="uv-status-filter">
+            <option value="">전체 상태</option>
+            <option value="pending">대기</option>
+            <option value="approved">승인</option>
+            <option value="rejected">거절</option>
+          </select>
+        </div>
+        <div style="margin-bottom:10px;display:flex;gap:8px;">
+          <button class="btn btn-small btn-primary" onclick="approveSelectedUvInquiries()">선택 승인</button>
+          <button class="btn btn-small btn-danger" onclick="deleteSelectedUvInquiries()">선택 삭제</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="uv-select-all" onchange="toggleAllUvInquiries(this.checked)"></th>
+              <th class="sortable" onclick="sortUvInquiries('name')">이름</th>
+              <th>연락처</th>
+              <th class="sortable" onclick="sortUvInquiries('email')">이메일</th>
+              <th>기수</th>
+              <th class="sortable" onclick="sortUvInquiries('created_at')">신청일</th>
+              <th class="sortable" onclick="sortUvInquiries('status')">상태</th>
+              <th>비고</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="uv-table-body">
+            <tr><td colspan="9" class="empty">로딩 중...</td></tr>
+          </tbody>
+        </table>
+        <div id="uv-empty" class="empty hidden">가입 신청이 없습니다.</div>
+      </div>
+
+      <!-- 멤버 관리 -->
+      <div class="card">
+        <h3>승인된 멤버 관리 (<span id="uv-member-count">0</span>)</h3>
+        <div class="search-bar">
+          <input type="text" id="uv-member-search" placeholder="이름, 이메일로 검색...">
+        </div>
+        <div style="margin-bottom:10px;display:flex;gap:8px;">
+          <button class="btn btn-small btn-danger" onclick="deleteSelectedUvMembers()">선택 삭제</button>
+        </div>
+        <!-- 멤버 일괄 수정 바 -->
+        <div class="hidden" id="uv-member-bulk-bar" style="padding: 12px; background: var(--bg3); border: 1px solid var(--accent); border-radius: 8px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <span style="font-size: 13px; color: var(--accent); font-weight: 600;"><span id="uv-member-bulk-count">0</span>명 선택</span>
+          <input type="email" id="uv-member-bulk-email" placeholder="이메일 변경" style="width: 200px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
+          <select id="uv-member-bulk-batch" style="padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
+            <option value="">기수 변경</option>
+            <option value="유벤져스 1기">유벤져스 1기</option>
+            <option value="유벤져스 2기">유벤져스 2기</option>
+            <option value="관리자">관리자</option>
+          </select>
+          <input type="text" id="uv-member-bulk-notes" placeholder="비고 변경" style="width: 180px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
+          <button class="btn btn-small btn-primary" onclick="applyUvMemberBulkEdit()">일괄 적용</button>
+          <button class="btn btn-small btn-outline" onclick="cancelUvMemberBulkEdit()">취소</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="uv-member-select-all" onchange="toggleAllUvMembers(this.checked)"></th>
+              <th class="sortable" onclick="sortUvMembers('name')">이름</th>
+              <th>연락처</th>
+              <th class="sortable" onclick="sortUvMembers('email')">이메일</th>
+              <th>기수</th>
+              <th>역할</th>
+              <th>동시접속</th>
+              <th class="sortable" onclick="sortUvMembers('created_at')">신청일</th>
+              <th>상태</th>
+              <th>비고</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="uv-member-body"></tbody>
+        </table>
+        <div id="uv-member-empty" class="empty hidden">승인된 멤버가 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수정 모달 -->
+  <div class="modal-overlay hidden" id="edit-modal">
+    <div class="modal">
+      <h3>사용자 수정</h3>
+      <input type="hidden" id="edit-id">
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>이메일</label>
+        <input type="email" id="edit-email">
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>상태</label>
+        <select id="edit-status">
+          <option value="active">Active</option>
+          <option value="revoked">Revoked</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>허용 확장프로그램</label>
+        <div class="checkbox-group" id="edit-extensions">
+          <label><input type="checkbox" value="grok-pro"> Grok Pro</label>
+          <label><input type="checkbox" value="genspark-pro"> Genspark Pro</label>
+          <label><input type="checkbox" value="genspark-hub"> Genspark Hub</label>
+          <label><input type="checkbox" value="flow-pro"> Flow Pro</label>
+          <label><input type="checkbox" value="jp-eco"> JP Eco</label>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>동시접속 (0 = 무제한)</label>
+        <input type="number" id="edit-max-sessions" value="1" min="0" style="width: 100px;">
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>기수</label>
+        <input type="text" id="edit-cohort" placeholder="예: 1기">
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>메모</label>
+        <input type="text" id="edit-memo">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="edit-cancel">취소</button>
+        <button class="btn btn-primary" id="edit-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script>
+    // ========== Supabase 설정 ==========
+    // service_role 키는 제거됨. 브라우저에는 공개키(anon)만 두고,
+    // 실제 권한은 로그인한 관리자의 JWT + DB 의 RLS(private.is_admin())가 판정한다.
+    const SUPABASE_URL = 'https://dnflcjpjzqmrybtcleqy.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuZmxjanBqenFtcnlidGNsZXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NTIyMjUsImV4cCI6MjA4OTAyODIyNX0._g01argDVGK1Wmm0GT-ThidWu33ls--IR-7F20_zJF8';
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+
+    let accessToken = null;   // 로그인 후 채워짐
+    let currentAdmin = null;  // { email, name }
+
+    function apiHeaders(extra) {
+      return Object.assign({
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+      }, extra || {});
+    }
+
+    // ========== API 헬퍼 ==========
+    async function supabaseGet(table, query = '') {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`API 오류: ${res.status}`);
+      return res.json();
+    }
+
+    async function supabasePost(table, body) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+        method: 'POST', headers: { ...apiHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || `API 오류: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function supabasePatch(table, id, body) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+        method: 'PATCH', headers: { ...apiHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`API 오류: ${res.status} - ${errBody}`);
+      }
+      return res.json();
+    }
+
+    async function supabaseDelete(table, query) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+        method: 'DELETE', headers
+      });
+      if (!res.ok) throw new Error(`API 오류: ${res.status}`);
+    }
+
+    // ========== 알림 ==========
+    function toast(msg, type = 'success') {
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    // ========== 탭 전환 ==========
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.getElementById('tab-users').classList.toggle('hidden', target !== 'users');
+        document.getElementById('tab-sessions').classList.toggle('hidden', target !== 'sessions');
+        document.getElementById('tab-uvengers').classList.toggle('hidden', target !== 'uvengers');
+        if (target === 'sessions') loadSessions();
+        if (target === 'uvengers') { loadUvInquiries(); loadUvMembers(); }
+      });
+    });
+
+    // ========== 사용자 목록 ==========
+    let usersData = [];
+    let sortField = 'email';
+    let sortDir = 'asc';
+
+    async function loadUsers() {
+      try {
+        usersData = await supabaseGet('licensed_users', 'order=created_at.desc');
+        document.getElementById('status-dot').classList.add('connected');
+        document.getElementById('connection-text').textContent = '연결됨';
+        renderUsers();
+      } catch (err) {
+        document.getElementById('user-list').innerHTML = `<tr><td colspan="6" class="empty" style="color: var(--red);">오류: ${err.message}</td></tr>`;
+        document.getElementById('connection-text').textContent = '연결 실패';
+      }
+    }
+
+    function renderUsers() {
+      const query = document.getElementById('user-search').value.trim().toLowerCase();
+      const statusFilter = document.getElementById('status-filter').value;
+      const tbody = document.getElementById('user-list');
+
+      // 필터
+      let filtered = usersData.filter(u => {
+        if (statusFilter && u.status !== statusFilter) return false;
+        if (query) {
+          const haystack = [u.email, u.cohort || '', u.memo || '', ...(u.allowed_extensions || [])].join(' ').toLowerCase();
+          return haystack.includes(query);
+        }
+        return true;
+      });
+
+      // 정렬
+      filtered.sort((a, b) => {
+        let va = a[sortField] ?? '';
+        let vb = b[sortField] ?? '';
+        if (typeof va === 'number' && typeof vb === 'number') return sortDir === 'asc' ? va - vb : vb - va;
+        va = va.toString().toLowerCase();
+        vb = vb.toString().toLowerCase();
+        return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+
+      document.getElementById('user-count').textContent = filtered.length + (filtered.length !== usersData.length ? `/${usersData.length}` : '');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty">${usersData.length === 0 ? '등록된 사용자가 없습니다' : '검색 결과가 없습니다'}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(u => `
+        <tr>
+          <td><input type="checkbox" class="user-checkbox" data-id="${u.id}" data-email="${u.email}"></td>
+          <td style="overflow: hidden; text-overflow: ellipsis;">${u.email}</td>
+          <td style="white-space: normal; word-break: break-word;">${(u.allowed_extensions || []).map(e => `<span class="ext-tag ext-tag-${e}">${e}</span>`).join('')}</td>
+          <td style="text-align: center;">${u.max_sessions === 0 ? '<span style="color: var(--accent);">∞</span>' : (u.max_sessions ?? 1)}</td>
+          <td><span class="badge badge-${u.status}">${u.status}</span></td>
+          <td style="color: var(--text2); font-size: 12px;">${u.cohort || '-'}</td>
+          <td style="color: var(--text3); font-size: 12px; overflow: hidden; text-overflow: ellipsis;">${u.memo || '-'}</td>
+          <td>
+            <div class="actions" style="white-space: nowrap;">
+              <button class="btn btn-small btn-outline" onclick="openEditModal('${u.id}')">수정</button>
+              <button class="btn btn-small btn-danger" onclick="deleteUser('${u.id}', '${u.email}')">삭제</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      // 정렬 헤더 표시 업데이트
+      document.querySelectorAll('th.sortable').forEach(th => {
+        th.classList.remove('asc', 'desc');
+        if (th.dataset.sort === sortField) th.classList.add(sortDir);
+      });
+    }
+
+    // 검색 + 필터 이벤트
+    document.getElementById('user-search').addEventListener('input', renderUsers);
+    document.getElementById('status-filter').addEventListener('change', renderUsers);
+
+    // 정렬 클릭
+    document.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const field = th.dataset.sort;
+        if (sortField === field) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortField = field;
+          sortDir = 'asc';
+        }
+        renderUsers();
+      });
+    });
+
+    // ========== 사용자 추가 ==========
+    document.getElementById('add-user-btn').addEventListener('click', async () => {
+      const email = document.getElementById('add-email').value.trim().toLowerCase();
+      const cohort = document.getElementById('add-cohort').value.trim();
+      const memo = document.getElementById('add-memo').value.trim();
+      const maxSessions = parseInt(document.getElementById('add-max-sessions').value) || 1;
+      const extensions = [...document.querySelectorAll('#tab-users .checkbox-group input:checked')].map(c => c.value);
+
+      if (!email || !email.includes('@')) { toast('올바른 이메일을 입력하세요', 'error'); return; }
+      if (extensions.length === 0) { toast('허용 확장프로그램을 선택하세요', 'error'); return; }
+
+      try {
+        await supabasePost('licensed_users', {
+          email, memo: memo || null,
+          cohort: cohort || null,
+          allowed_extensions: extensions,
+          max_sessions: maxSessions,
+          status: 'active'
+        });
+        // 각 확장프로그램에 대해 registered 세션 생성
+        for (const ext of extensions) {
+          try {
+            await supabasePost('sessions', {
+              user_email: email,
+              extension_id: ext,
+              status: 'registered',
+              session_token: crypto.randomUUID(),
+              device_info: {},
+              created_at: new Date().toISOString(),
+              last_active: null
+            });
+          } catch (e) { /* 이미 존재하면 무시 */ }
+        }
+        toast(`${email} 추가됨`);
+        document.getElementById('add-email').value = '';
+        document.getElementById('add-cohort').value = '';
+        document.getElementById('add-memo').value = '';
+        loadUsers();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    // ========== 사용자 삭제 ==========
+    async function deleteUser(id, email) {
+      if (!confirm(`${email}\n\n정말 삭제하시겠습니까?\n관련 세션도 함께 삭제됩니다.`)) return;
+      try {
+        await supabaseDelete('licensed_users', `id=eq.${id}`);
+        toast(`${email} 삭제됨`);
+        loadUsers();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    }
+
+    // ========== 수정 모달 ==========
+    let allUsers = [];
+
+    async function openEditModal(id) {
+      const users = await supabaseGet('licensed_users', `id=eq.${id}`);
+      if (users.length === 0) return;
+      const u = users[0];
+
+      document.getElementById('edit-id').value = u.id;
+      document.getElementById('edit-email').value = u.email;
+      document.getElementById('edit-status').value = u.status;
+      document.getElementById('edit-memo').value = u.memo || '';
+      document.getElementById('edit-cohort').value = u.cohort || '';
+      document.getElementById('edit-max-sessions').value = u.max_sessions ?? 1;
+
+      document.querySelectorAll('#edit-extensions input').forEach(cb => {
+        cb.checked = (u.allowed_extensions || []).includes(cb.value);
+      });
+
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    document.getElementById('edit-cancel').addEventListener('click', () => {
+      document.getElementById('edit-modal').classList.add('hidden');
+    });
+
+    document.getElementById('edit-save').addEventListener('click', async () => {
+      const id = document.getElementById('edit-id').value;
+      const email = document.getElementById('edit-email').value.trim();
+      const status = document.getElementById('edit-status').value;
+      const cohort = document.getElementById('edit-cohort').value.trim();
+      const memo = document.getElementById('edit-memo').value.trim();
+      const maxSessions = parseInt(document.getElementById('edit-max-sessions').value) || 1;
+      const extensions = [...document.querySelectorAll('#edit-extensions input:checked')].map(c => c.value);
+
+      try {
+        await supabasePatch('licensed_users', id, {
+          email,
+          status,
+          cohort: cohort || null,
+          memo: memo || null,
+          allowed_extensions: extensions,
+          max_sessions: maxSessions,
+          updated_at: new Date().toISOString()
+        });
+        toast('수정 완료');
+        document.getElementById('edit-modal').classList.add('hidden');
+        loadUsers();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    // 모달 바깥 클릭 시 닫기
+    document.getElementById('edit-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'edit-modal') {
+        document.getElementById('edit-modal').classList.add('hidden');
+      }
+    });
+
+    // ========== 일괄 수정 ==========
+    document.getElementById('select-all-users').addEventListener('change', (e) => {
+      document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = e.target.checked);
+      updateBulkEditBar();
+    });
+
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('user-checkbox')) updateBulkEditBar();
+    });
+
+    function updateBulkEditBar() {
+      const checked = document.querySelectorAll('.user-checkbox:checked');
+      const bar = document.getElementById('bulk-edit-bar');
+      if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        bar.style.display = 'flex';
+        document.getElementById('bulk-selected-count').textContent = checked.length;
+      } else {
+        bar.classList.add('hidden');
+        bar.style.display = 'none';
+      }
+    }
+
+    document.getElementById('bulk-edit-cancel').addEventListener('click', () => {
+      document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = false);
+      document.getElementById('select-all-users').checked = false;
+      updateBulkEditBar();
+    });
+
+    document.getElementById('bulk-edit-apply').addEventListener('click', async () => {
+      const checked = [...document.querySelectorAll('.user-checkbox:checked')];
+      if (checked.length === 0) return;
+
+      const extensions = [...document.querySelectorAll('#bulk-edit-extensions input:checked')].map(c => c.value);
+      const sessionsInput = document.getElementById('bulk-edit-sessions').value;
+      const maxSessions = sessionsInput !== '' ? parseInt(sessionsInput) : null;
+      const cohortInput = document.getElementById('bulk-edit-cohort').value.trim();
+      const cohort = cohortInput !== '' ? cohortInput : null;
+
+      if (extensions.length === 0 && maxSessions === null && cohort === null) {
+        toast('변경할 항목을 선택하세요 (확장프로그램, 동시접속 또는 기수)', 'error');
+        return;
+      }
+
+      const ids = checked.map(cb => cb.dataset.id);
+      if (!confirm(`${ids.length}명에게 일괄 적용하시겠습니까?`)) return;
+
+      let success = 0, fail = 0;
+      for (const id of ids) {
+        try {
+          const update = { updated_at: new Date().toISOString() };
+          if (extensions.length > 0) update.allowed_extensions = extensions;
+          if (maxSessions !== null) update.max_sessions = maxSessions;
+          if (cohort !== null) update.cohort = cohort;
+          await supabasePatch('licensed_users', id, update);
+          success++;
+        } catch (e) { fail++; }
+      }
+
+      toast(`${success}명 수정 완료` + (fail > 0 ? `, ${fail}명 실패` : ''));
+      document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = false);
+      document.getElementById('select-all-users').checked = false;
+      updateBulkEditBar();
+      loadUsers();
+    });
+
+    // ========== 세션 목록 ==========
+    let sessionsData = [];
+    let sessionSortField = 'last_active';
+    let sessionSortDir = 'desc';
+
+    async function loadSessions() {
+      try {
+        sessionsData = await supabaseGet('sessions', 'order=last_active.desc');
+        renderSessions();
+      } catch (err) {
+        document.getElementById('session-list').innerHTML = `<tr><td colspan="5" class="empty" style="color: var(--red);">오류: ${err.message}</td></tr>`;
+      }
+    }
+
+    function renderSessions() {
+      const query = (document.getElementById('session-search')?.value || '').trim().toLowerCase();
+      const extFilter = (document.getElementById('session-ext-filter')?.value || '');
+      const statusFilter = (document.getElementById('session-status-filter')?.value || '');
+      const tbody = document.getElementById('session-list');
+
+      // 이메일별 그룹화
+      const grouped = {};
+      for (const s of sessionsData) {
+        if (!grouped[s.user_email]) grouped[s.user_email] = [];
+        grouped[s.user_email].push(s);
+      }
+
+      // 그룹별 요약 생성
+      let rows = Object.entries(grouped).map(([email, sessions]) => {
+        const userInfo = usersData.find(u => u.email === email);
+        const allowedExts = userInfo?.allowed_extensions || [];
+        const activeSessions = sessions.filter(s => s.status === 'active');
+        const activeExts = activeSessions.map(s => s.extension_id);
+        const lastActive = sessions.reduce((max, s) => {
+          if (!s.last_active) return max;
+          const t = new Date(s.last_active).getTime();
+          return t > max ? t : max;
+        }, 0);
+        const cohort = userInfo?.cohort || '';
+        const memo = userInfo?.memo || '';
+        const activeIds = activeSessions.map(s => ({ id: s.id, ext: s.extension_id }));
+        return { email, allowedExts, activeExts, activeIds, lastActive, cohort, memo, hasActive: activeExts.length > 0 };
+      });
+
+      // 필터
+      rows = rows.filter(r => {
+        if (extFilter && !r.allowedExts.includes(extFilter) && !r.activeExts.includes(extFilter)) return false;
+        if (statusFilter === 'active' && !r.hasActive) return false;
+        if (statusFilter === 'registered' && r.hasActive) return false;
+        if (statusFilter === 'kicked' || statusFilter === 'expired') {
+          const hasThat = grouped[r.email]?.some(s => s.status === statusFilter);
+          if (!hasThat) return false;
+        }
+        if (query && !r.email.toLowerCase().includes(query) && !r.cohort.toLowerCase().includes(query) && !r.memo.toLowerCase().includes(query)) return false;
+        return true;
+      });
+
+      // 정렬
+      rows.sort((a, b) => {
+        let va, vb;
+        if (sessionSortField === 'cohort') { va = a.cohort.toLowerCase(); vb = b.cohort.toLowerCase(); return sessionSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va); }
+        if (sessionSortField === 'memo') { va = a.memo.toLowerCase(); vb = b.memo.toLowerCase(); return sessionSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va); }
+        if (sessionSortField === 'last_active') { va = a.lastActive; vb = b.lastActive; return sessionSortDir === 'asc' ? va - vb : vb - va; }
+        if (sessionSortField === 'user_email') { va = a.email.toLowerCase(); vb = b.email.toLowerCase(); return sessionSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va); }
+        return 0;
+      });
+
+      document.getElementById('session-count').textContent = rows.length + (rows.length !== Object.keys(grouped).length ? `/${Object.keys(grouped).length}` : '');
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">${sessionsData.length === 0 ? '세션이 없습니다' : '검색 결과가 없습니다'}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        let activeHtml;
+        if (r.lastActive) {
+          const d = new Date(r.lastActive);
+          activeHtml = `${d.toLocaleDateString('ko-KR')}<br><span style="color:var(--text3);">${d.toLocaleTimeString('ko-KR')}</span>`;
+        } else {
+          activeHtml = '미사용';
+        }
+        const allowedHtml = r.allowedExts.map(e => `<span class="ext-tag ext-tag-${e}">${e}</span>`).join(' ');
+        const activeExtHtml = r.activeExts.length > 0
+          ? r.activeExts.map(e => `<span class="ext-tag ext-tag-${e}" style="box-shadow: 0 0 6px rgba(39,174,96,0.5);">${e}</span>`).join(' ')
+          : '<span style="color: var(--text3); font-size: 12px;">없음</span>';
+        const kickBtns = r.activeIds.map(s => `<button class="btn btn-small btn-danger" onclick="kickSession('${s.id}', '${r.email}')" style="font-size: 11px; padding: 4px 8px; white-space: nowrap;">종료 ${s.ext}</button>`).join(' ');
+        return `
+          <tr style="${!r.hasActive ? 'opacity: 0.6;' : ''}">
+            <td style="overflow: hidden; text-overflow: ellipsis;">${r.email}</td>
+            <td style="white-space: normal; word-break: break-word;">${allowedHtml}</td>
+            <td style="white-space: normal; word-break: break-word;">${activeExtHtml}</td>
+            <td style="color: var(--text2); font-size: 12px;">${r.cohort || '-'}</td>
+            <td style="color: var(--text3); font-size: 12px; overflow: hidden; text-overflow: ellipsis;">${r.memo || '-'}</td>
+            <td class="session-info">${activeHtml}</td>
+            <td style="white-space: normal;">${kickBtns}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 세션 검색/필터 이벤트
+    document.getElementById('session-search')?.addEventListener('input', renderSessions);
+    document.getElementById('session-ext-filter')?.addEventListener('change', renderSessions);
+    document.getElementById('session-status-filter')?.addEventListener('change', renderSessions);
+
+    // 세션 정렬 클릭
+    document.querySelectorAll('th[data-session-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const field = th.dataset.sessionSort;
+        if (sessionSortField === field) {
+          sessionSortDir = sessionSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sessionSortField = field;
+          sessionSortDir = 'desc';
+        }
+        // 정렬 표시 업데이트
+        document.querySelectorAll('th[data-session-sort]').forEach(h => h.classList.remove('asc', 'desc'));
+        th.classList.add(sessionSortDir);
+        renderSessions();
+      });
+    });
+
+    async function kickSession(id, email) {
+      if (!confirm(`${email} 세션을 강제 종료하시겠습니까?`)) return;
+      try {
+        await supabasePatch('sessions', id, { status: 'kicked', last_active: new Date().toISOString() });
+        toast(`${email} 세션 종료됨`);
+        loadSessions();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    }
+
+    // ========== 대량 등록 (Excel) ==========
+    const VALID_EXTENSIONS = ['grok-pro', 'genspark-pro', 'genspark-hub', 'flow-pro', 'jp-eco'];
+    let bulkData = [];
+
+    // 템플릿 다운로드
+    document.getElementById('download-template').addEventListener('click', () => {
+      const template = [
+        { '이메일': 'example@gmail.com', 'grok-pro': 'O', 'genspark-pro': 'O', 'genspark-hub': 'O', 'flow-pro': 'O', 'jp-eco': 'O', '동시접속': 1, '기수': '1기', '메모': '예시 (이 행은 삭제하세요)' }
+      ];
+      const ws = XLSX.utils.json_to_sheet(template);
+      ws['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 30 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '사용자');
+      XLSX.writeFile(wb, 'RAION_사용자_템플릿.xlsx');
+    });
+
+    // Excel 업로드
+    document.getElementById('excel-upload').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const status = document.getElementById('upload-status');
+      status.textContent = '파일 읽는 중...';
+      status.style.color = 'var(--text3)';
+
+      try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data);
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
+        if (rows.length === 0) { status.textContent = '데이터가 없습니다'; status.style.color = 'var(--red)'; return; }
+
+        bulkData = rows.map(row => {
+          const email = (row['이메일'] || '').toString().trim().toLowerCase();
+          const extensions = VALID_EXTENSIONS.filter(ext => {
+            const val = (row[ext] || '').toString().trim().toUpperCase();
+            return val === 'O' || val === 'YES' || val === 'Y' || val === '1' || val === 'TRUE';
+          });
+          const maxSessions = parseInt(row['동시접속']) || 1;
+          const cohort = (row['기수'] || '').toString().trim();
+          const memo = (row['메모'] || '').toString().trim();
+          const valid = email.includes('@') && extensions.length > 0;
+          return { email, extensions, maxSessions, cohort, memo, valid };
+        });
+
+        const validCount = bulkData.filter(r => r.valid).length;
+        const invalidCount = bulkData.filter(r => !r.valid).length;
+
+        status.textContent = `${validCount}명 유효` + (invalidCount > 0 ? `, ${invalidCount}명 오류` : '');
+        status.style.color = invalidCount > 0 ? 'var(--accent)' : 'var(--green)';
+
+        // 미리보기 렌더
+        document.getElementById('bulk-count').textContent = validCount;
+        document.getElementById('bulk-list').innerHTML = bulkData.map(r => `
+          <tr style="opacity: ${r.valid ? 1 : 0.4};">
+            <td>${r.email || '<span style="color:var(--red);">이메일 없음</span>'}</td>
+            <td>${r.extensions.map(e => `<span class="ext-tag ext-tag-${e}">${e}</span>`).join('') || '<span style="color:var(--red);">미선택</span>'}</td>
+            <td style="text-align: center;">${r.maxSessions === 0 ? '∞' : r.maxSessions}</td>
+            <td style="color: var(--text2);">${r.cohort || '-'}</td>
+            <td style="color: var(--text3);">${r.memo || '-'}</td>
+            <td>${r.valid ? '<span style="color:var(--green);">OK</span>' : '<span style="color:var(--red);">오류</span>'}</td>
+          </tr>
+        `).join('');
+        document.getElementById('bulk-preview').classList.remove('hidden');
+
+      } catch (err) {
+        status.textContent = `파일 오류: ${err.message}`;
+        status.style.color = 'var(--red)';
+      }
+      e.target.value = '';
+    });
+
+    // 일괄 등록
+    document.getElementById('bulk-submit').addEventListener('click', async () => {
+      const valid = bulkData.filter(r => r.valid);
+      if (valid.length === 0) { toast('등록할 유효 데이터가 없습니다', 'error'); return; }
+      if (!confirm(`${valid.length}명을 일괄 등록하시겠습니까?`)) return;
+
+      let success = 0, fail = 0;
+      const failedList = [];
+      for (const r of valid) {
+        try {
+          await supabasePost('licensed_users', {
+            email: r.email,
+            allowed_extensions: r.extensions,
+            max_sessions: r.maxSessions,
+            cohort: r.cohort || null,
+            memo: r.memo || null,
+            status: 'active'
+          });
+          // 각 확장프로그램에 대해 registered 세션 생성
+          for (const ext of r.extensions) {
+            try {
+              await supabasePost('sessions', {
+                user_email: r.email,
+                extension_id: ext,
+                status: 'registered',
+                session_token: crypto.randomUUID(),
+                device_info: {},
+                created_at: new Date().toISOString(),
+                last_active: null
+              });
+            } catch (e) { /* 이미 존재하면 무시 */ }
+          }
+          success++;
+        } catch (err) {
+          fail++;
+          failedList.push({
+            email: r.email,
+            memo: r.memo || '-',
+            error: err.message.includes('duplicate') || err.message.includes('unique') ? '이미 등록된 이메일' : err.message
+          });
+        }
+      }
+
+      toast(`${success}명 등록 완료` + (fail > 0 ? `, ${fail}명 실패` : ''));
+
+      // 결과 표시
+      const resultEl = document.getElementById('bulk-result');
+      const resultTitle = document.getElementById('bulk-result-title');
+      const resultList = document.getElementById('bulk-result-list');
+
+      if (failedList.length > 0) {
+        resultTitle.innerHTML = `✅ ${success}명 등록 완료 &nbsp;/&nbsp; <span style="color: var(--red);">❌ ${fail}명 실패</span>`;
+        resultList.innerHTML = failedList.map(f =>
+          `<div style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+            <span style="color: var(--red);">✗</span> <strong>${f.email}</strong> — <span style="color: var(--text3);">${f.memo}</span> — <span style="color: var(--red);">${f.error}</span>
+          </div>`
+        ).join('');
+      } else {
+        resultTitle.textContent = `✅ ${success}명 전원 등록 완료!`;
+        resultList.innerHTML = '';
+      }
+      resultEl.classList.remove('hidden');
+
+      document.getElementById('bulk-preview').classList.add('hidden');
+      document.getElementById('upload-status').textContent = '';
+      bulkData = [];
+      loadUsers();
+    });
+
+    // 취소
+    document.getElementById('bulk-cancel').addEventListener('click', () => {
+      document.getElementById('bulk-preview').classList.add('hidden');
+      document.getElementById('upload-status').textContent = '';
+      bulkData = [];
+    });
+
+    // ========== 유벤져스 가입 신청 관리 ==========
+    let uvInquiries = [];
+
+    async function loadUvInquiries() {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?status=eq.pending&order=created_at.desc`, { headers: apiHeaders() });
+        if (!res.ok) throw new Error('API 오류');
+        uvInquiries = await res.json();
+        document.getElementById('uv-count').textContent = uvInquiries.length;
+        renderUvInquiries();
+      } catch (e) {
+        console.error('유벤져스 데이터 로드 실패:', e);
+      }
+    }
+
+    function renderUvInquiries() {
+      const search = (document.getElementById('uv-search').value || '').toLowerCase();
+
+      const filtered = uvInquiries.filter(i => {
+        return !search ||
+          i.name.toLowerCase().includes(search) ||
+          i.email.toLowerCase().includes(search) ||
+          i.phone.includes(search);
+      });
+
+      const tbody = document.getElementById('uv-table-body');
+      const empty = document.getElementById('uv-empty');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = filtered.map(i => {
+        const date = new Date(i.created_at).toLocaleDateString('ko-KR');
+        const inputStyle = "padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;";
+        return `<tr>
+          <td><input type="checkbox" class="uv-inquiry-check" value="${i.id}"></td>
+          <td><input type="text" value="${i.name}" style="width:80px;${inputStyle}font-weight:600;"
+            onchange="updateUvInquiryField('${i.id}', 'name', this.value)"></td>
+          <td><input type="text" value="${i.phone}" style="width:120px;${inputStyle}"
+            onchange="updateUvInquiryField('${i.id}', 'phone', this.value)"></td>
+          <td><input type="text" value="${i.email}" style="width:180px;${inputStyle}"
+            onchange="updateUvInquiryField('${i.id}', 'email', this.value)"></td>
+          <td>${i.batch}</td>
+          <td>${date}</td>
+          <td><span class="badge badge-registered">대기</span></td>
+          <td><input type="text" value="${i.notes || ''}" style="width:120px;${inputStyle}"
+            onchange="updateUvInquiryField('${i.id}', 'notes', this.value)"></td>
+          <td class="actions">
+            <button class="btn btn-small btn-primary" onclick="updateUvStatus('${i.id}','approved')">승인</button>
+            <button class="btn btn-small btn-danger" onclick="deleteUvInquiry('${i.id}')">삭제</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // 정렬
+    let uvSortField = 'created_at';
+    let uvSortDir = 'desc';
+    function sortUvInquiries(field) {
+      if (uvSortField === field) { uvSortDir = uvSortDir === 'asc' ? 'desc' : 'asc'; }
+      else { uvSortField = field; uvSortDir = 'asc'; }
+      uvInquiries.sort((a, b) => {
+        const va = (a[uvSortField] || '').toString().toLowerCase();
+        const vb = (b[uvSortField] || '').toString().toLowerCase();
+        return uvSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+      renderUvInquiries();
+    }
+
+    // 전체 선택
+    function toggleAllUvInquiries(checked) {
+      document.querySelectorAll('.uv-inquiry-check').forEach(cb => cb.checked = checked);
+    }
+
+    // 개별 삭제
+    async function deleteUvInquiry(id) {
+      if (!confirm('이 신청을 삭제하시겠습니까?')) return;
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?id=eq.${id}`, { method: 'DELETE', headers: apiHeaders() });
+        toast('삭제 완료', 'success');
+        await loadUvInquiries();
+      } catch (e) { toast('삭제 실패', 'error'); }
+    }
+
+    // 선택 삭제
+    async function deleteSelectedUvInquiries() {
+      const checked = [...document.querySelectorAll('.uv-inquiry-check:checked')].map(cb => cb.value);
+      if (checked.length === 0) { toast('삭제할 항목을 선택해주세요', 'error'); return; }
+      if (!confirm(`${checked.length}개 신청을 삭제하시겠습니까?`)) return;
+      for (const id of checked) {
+        await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?id=eq.${id}`, { method: 'DELETE', headers: apiHeaders() });
+      }
+      toast(`${checked.length}개 삭제 완료`, 'success');
+      document.getElementById('uv-select-all').checked = false;
+      await loadUvInquiries();
+    }
+
+    async function updateUvStatus(id, newStatus) {
+      // DB에서 최신 신청 데이터를 가져옴 (인라인 수정 후 바로 승인 시 로컬 데이터 불일치 방지)
+      let inquiry;
+      try {
+        const freshRes = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?id=eq.${id}`, { headers: apiHeaders() });
+        const freshData = await freshRes.json();
+        inquiry = freshData[0];
+      } catch (e) {}
+      if (!inquiry) inquiry = uvInquiries.find(i => i.id === id);
+      if (!inquiry) { toast('신청 정보를 찾을 수 없습니다', 'error'); return; }
+
+      try {
+        // 승인 시: 중복 체크 후 uvengers_members에 등록, 신청 목록에서 제거
+        if (newStatus === 'approved') {
+          // 이메일 중복 체크
+          const dupCheck = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_members?email=eq.${encodeURIComponent(inquiry.email)}&select=id`, { headers: apiHeaders() });
+          const dupData = await dupCheck.json();
+          if (dupData.length > 0) {
+            // 이미 멤버 → 신청만 삭제
+            await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?id=eq.${id}`, { method: 'DELETE', headers: apiHeaders() });
+            toast(`${inquiry.name}: 이미 등록된 멤버 (신청 제거됨)`, 'success');
+          } else {
+            const role = inquiry.batch === '관리자' ? 'admin' : 'member';
+            const memberRes = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_members`, {
+              method: 'POST',
+              headers: { ...apiHeaders(), 'Prefer': 'return=representation' },
+              body: JSON.stringify({ email: inquiry.email, name: inquiry.name, phone: inquiry.phone, batch: inquiry.batch, role, max_sessions: 1, notes: inquiry.notes || null })
+            });
+
+            if (memberRes.ok) {
+              await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?id=eq.${id}`, { method: 'DELETE', headers: apiHeaders() });
+              toast(`승인 완료! ${inquiry.email}로 구글 로그인 가능`, 'success');
+            } else {
+              const errText = await memberRes.text();
+              toast('멤버 등록 실패: ' + errText, 'error');
+            }
+          }
+        }
+      } catch (e) {
+        toast('처리 실패: ' + e.message, 'error');
+      }
+
+      await loadUvInquiries();
+      await loadUvMembers();
+    }
+
+    // 비밀번호 재설정 — 현재 비활성
+    // 이 기능은 Auth Admin API(/auth/v1/admin/users)를 호출하는데, 이는 service_role 키 전용이라
+    // 브라우저에서 실행할 수 없다(키를 노출시키지 않고는 불가능). 관리자 JWT 로는 호출 권한이 없다.
+    //
+    // 게다가 기존 구현은 이미 동작하지 않았다: Auth 비밀번호를 먼저 바꾼 뒤
+    // uvengers_members.temp_password 에 PATCH 하는데 그 컬럼이 존재하지 않아 예외로 빠졌고,
+    // 결과적으로 "사용자 비밀번호는 바뀌었는데 관리자는 새 비밀번호를 못 보는" 상태가 됐다.
+    //
+    // 올바른 해법 = 호출자의 JWT 가 admin 인지 검증한 뒤 내부적으로 service_role 을 쓰는
+    // Edge Function(확장 4종의 login/verify 와 같은 패턴). 그 전까지는 아래 이메일 발송 방식을 쓴다.
+    async function resetUvPassword(email, memberId) {
+      alert('직접 비밀번호 재설정은 현재 사용할 수 없습니다.\n\n' +
+            '대신 "재설정 이메일 발송"을 사용하세요. ' + email + ' 로 재설정 링크가 전송됩니다.\n\n' +
+            '(사유: 이 기능은 service_role 키가 필요해 브라우저에서 실행할 수 없습니다. ' +
+            'Edge Function 으로 옮기면 복구됩니다.)');
+    }
+
+    // 이메일로 비밀번호 재설정 링크 발송
+    async function sendUvPasswordReset(email) {
+      if (!confirm(`${email}로 비밀번호 재설정 이메일을 발송하시겠습니까?`)) return;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+          body: JSON.stringify({ email })
+        });
+        if (res.ok) {
+          toast(`${email}로 재설정 이메일 발송 완료`, 'success');
+        } else {
+          const errText = await res.text();
+          toast('이메일 발송 실패: ' + errText, 'error');
+        }
+      } catch (e) {
+        toast('오류: ' + e.message, 'error');
+      }
+    }
+
+    async function addUvInquiry() {
+      const name = document.getElementById('uv-add-name').value.trim();
+      const phone = document.getElementById('uv-add-phone').value.trim();
+      const email = document.getElementById('uv-add-email').value.trim();
+      const batch = document.getElementById('uv-add-batch').value;
+      const status = document.getElementById('uv-add-status').value;
+      const notes = document.getElementById('uv-add-notes').value.trim();
+      if (!name || !phone || !email) {
+        toast('이름, 연락처, 이메일을 입력해주세요', 'error');
+        return;
+      }
+      // 중복 체크 (이메일 기준)
+      const dup = uvInquiries.find(i => i.email === email);
+      if (dup) {
+        toast('이미 동일한 이메일로 신청이 존재합니다', 'error');
+        return;
+      }
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries`, {
+          method: 'POST',
+          headers: { ...apiHeaders(), 'Prefer': 'return=representation' },
+          body: JSON.stringify({ name, phone, email, batch, status, notes: notes || null })
+        });
+        if (!res.ok) throw new Error('추가 실패');
+        toast('신청 추가 완료', 'success');
+        document.getElementById('uv-add-name').value = '';
+        document.getElementById('uv-add-phone').value = '';
+        document.getElementById('uv-add-email').value = '';
+        document.getElementById('uv-add-notes').value = '';
+        await loadUvInquiries();
+      } catch (e) {
+        toast('추가 실패: ' + e.message, 'error');
+      }
+    }
+
+    // ========== 유벤져스 멤버 관리 ==========
+    let uvMembers = [];
+
+    async function loadUvMembers() {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_members?order=created_at.desc`, { headers: apiHeaders() });
+        if (!res.ok) throw new Error('API 오류');
+        uvMembers = await res.json();
+        document.getElementById('uv-member-count').textContent = uvMembers.length;
+        renderUvMembers();
+      } catch (e) {
+        console.error('멤버 데이터 로드 실패:', e);
+      }
+    }
+
+    function renderUvMembers() {
+      const search = (document.getElementById('uv-member-search').value || '').toLowerCase();
+      const filtered = uvMembers.filter(m =>
+        !search || m.name.toLowerCase().includes(search) || m.email.toLowerCase().includes(search)
+      );
+
+      const tbody = document.getElementById('uv-member-body');
+      const empty = document.getElementById('uv-member-empty');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = filtered.map(m => {
+        const roleClass = m.role === 'admin' ? 'badge-active' : 'badge-registered';
+        const roleText = m.role === 'admin' ? '관리자' : '멤버';
+        const statusClass = m.status === 'active' ? 'badge-active' : 'badge-revoked';
+        const statusText = m.status === 'active' ? 'Active' : 'Suspended';
+        const createdDate = m.created_at ? new Date(m.created_at).toLocaleDateString('ko-KR') : '-';
+        const mInputStyle = "padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;";
+        return `<tr>
+          <td><input type="checkbox" class="uv-member-check" value="${m.id}" onchange="updateUvMemberBulkBar()"></td>
+          <td><input type="text" value="${m.name}" style="width:80px;${mInputStyle}font-weight:600;"
+            onchange="updateUvMember('${m.id}', { name: this.value })"></td>
+          <td><input type="text" value="${m.phone || ''}" style="width:120px;${mInputStyle}"
+            onchange="updateUvMember('${m.id}', { phone: this.value })"></td>
+          <td><input type="text" value="${m.email}" style="width:180px;${mInputStyle}"
+            onchange="updateUvMember('${m.id}', { email: this.value })"></td>
+          <td>${m.batch}</td>
+          <td><span class="badge ${roleClass}">${roleText}</span></td>
+          <td>
+            <input type="number" value="${m.max_sessions}" min="0" max="10" style="width:50px;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);text-align:center;"
+              onchange="updateUvMember('${m.id}', { max_sessions: parseInt(this.value) })">
+          </td>
+          <td>${createdDate}</td>
+          <td><span class="badge ${statusClass}">${statusText}</span></td>
+          <td><input type="text" value="${m.notes || ''}" style="width:120px;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;"
+            onchange="updateUvMember('${m.id}', { notes: this.value })"></td>
+          <td class="actions">
+            <button class="btn btn-small ${m.role === 'admin' ? 'btn-danger' : 'btn-primary'}"
+              onclick="updateUvMember('${m.id}', { role: '${m.role === 'admin' ? 'member' : 'admin'}' })">
+              ${m.role === 'admin' ? '관리자 해제' : '관리자 부여'}
+            </button>
+            <button class="btn btn-small ${m.status === 'active' ? 'btn-danger' : 'btn-outline'}"
+              onclick="updateUvMember('${m.id}', { status: '${m.status === 'active' ? 'suspended' : 'active'}' })">
+              ${m.status === 'active' ? '정지' : '활성화'}
+            </button>
+            <button class="btn btn-small btn-danger" onclick="deleteUvMember('${m.id}')">삭제</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function updateUvMember(id, updates) {
+      try {
+        await supabasePatch('uvengers_members', id, updates);
+        toast('멤버 정보 수정 완료', 'success');
+        await loadUvMembers();
+      } catch (e) {
+        toast('수정 실패: ' + e.message, 'error');
+      }
+    }
+
+    // 멤버 정렬
+    let uvMemberSortField = 'name';
+    let uvMemberSortDir = 'asc';
+    function sortUvMembers(field) {
+      if (uvMemberSortField === field) { uvMemberSortDir = uvMemberSortDir === 'asc' ? 'desc' : 'asc'; }
+      else { uvMemberSortField = field; uvMemberSortDir = 'asc'; }
+      uvMembers.sort((a, b) => {
+        const va = (a[uvMemberSortField] || '').toString().toLowerCase();
+        const vb = (b[uvMemberSortField] || '').toString().toLowerCase();
+        return uvMemberSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+      renderUvMembers();
+    }
+
+    function toggleAllUvMembers(checked) {
+      document.querySelectorAll('.uv-member-check').forEach(cb => cb.checked = checked);
+      updateUvMemberBulkBar();
+    }
+
+    async function deleteUvMember(id) {
+      if (!confirm('이 멤버를 삭제하시겠습니까?')) return;
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/uvengers_members?id=eq.${id}`, { method: 'DELETE', headers: apiHeaders() });
+        toast('멤버 삭제 완료', 'success');
+        await loadUvMembers();
+      } catch (e) { toast('삭제 실패', 'error'); }
+    }
+
+    async function deleteSelectedUvMembers() {
+      const checked = [...document.querySelectorAll('.uv-member-check:checked')].map(cb => cb.value);
+      if (checked.length === 0) { toast('삭제할 항목을 선택해주세요', 'error'); return; }
+      if (!confirm(`${checked.length}명의 멤버를 삭제하시겠습니까?`)) return;
+      for (const id of checked) {
+        await fetch(`${SUPABASE_URL}/rest/v1/uvengers_members?id=eq.${id}`, { method: 'DELETE', headers: apiHeaders() });
+      }
+      toast(`${checked.length}명 삭제 완료`, 'success');
+      document.getElementById('uv-member-select-all').checked = false;
+      await loadUvMembers();
+    }
+
+    document.getElementById('uv-member-search').addEventListener('input', renderUvMembers);
+    document.getElementById('uv-search').addEventListener('input', renderUvInquiries);
+    document.getElementById('uv-status-filter').addEventListener('change', renderUvInquiries);
+
+    // ========== 가입 신청 필드 수정 ==========
+    async function updateUvInquiryField(id, field, value) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uvengers_inquiries?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: { ...apiHeaders(), 'Prefer': 'return=representation' },
+          body: JSON.stringify({ [field]: value || null })
+        });
+        if (!res.ok) throw new Error('API 오류');
+        // 로컬 데이터도 업데이트
+        const inq = uvInquiries.find(i => i.id === id);
+        if (inq) inq[field] = value || null;
+        toast('수정 완료', 'success');
+      } catch (e) { toast('수정 실패', 'error'); }
+    }
+
+    // ========== 가입 신청 일괄 승인 ==========
+    async function approveSelectedUvInquiries() {
+      const checked = [...document.querySelectorAll('.uv-inquiry-check:checked')].map(cb => cb.value);
+      if (checked.length === 0) { toast('승인할 항목을 선택해주세요', 'error'); return; }
+      if (!confirm(`${checked.length}명을 일괄 승인하시겠습니까?`)) return;
+
+      let success = 0, fail = 0;
+      for (const id of checked) {
+        try {
+          await updateUvStatus(id, 'approved');
+          success++;
+        } catch (e) { fail++; }
+      }
+      document.getElementById('uv-select-all').checked = false;
+      toast(`${success}명 승인 완료` + (fail > 0 ? `, ${fail}명 실패` : ''));
+    }
+
+    // ========== 멤버 일괄 수정 바 ==========
+    function updateUvMemberBulkBar() {
+      const checked = document.querySelectorAll('.uv-member-check:checked');
+      const bar = document.getElementById('uv-member-bulk-bar');
+      if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        bar.style.display = 'flex';
+        document.getElementById('uv-member-bulk-count').textContent = checked.length;
+      } else {
+        bar.classList.add('hidden');
+        bar.style.display = 'none';
+      }
+    }
+
+    function cancelUvMemberBulkEdit() {
+      document.querySelectorAll('.uv-member-check').forEach(cb => cb.checked = false);
+      document.getElementById('uv-member-select-all').checked = false;
+      updateUvMemberBulkBar();
+    }
+
+    async function applyUvMemberBulkEdit() {
+      const checked = [...document.querySelectorAll('.uv-member-check:checked')].map(cb => cb.value);
+      if (checked.length === 0) return;
+
+      const email = document.getElementById('uv-member-bulk-email').value.trim();
+      const batch = document.getElementById('uv-member-bulk-batch').value;
+      const notes = document.getElementById('uv-member-bulk-notes').value.trim();
+
+      if (!email && !batch && !notes) {
+        toast('변경할 항목을 입력하세요 (이메일, 기수 또는 비고)', 'error');
+        return;
+      }
+
+      // 이메일은 1명만 선택했을 때만 변경 가능
+      if (email && checked.length > 1) {
+        toast('이메일 변경은 1명만 선택해주세요', 'error');
+        return;
+      }
+
+      if (!confirm(`${checked.length}명에게 일괄 적용하시겠습니까?`)) return;
+
+      let success = 0, fail = 0;
+      for (const id of checked) {
+        try {
+          const update = {};
+          if (email) update.email = email;
+          if (batch) update.batch = batch;
+          if (notes) update.notes = notes;
+          await supabasePatch('uvengers_members', id, update);
+          success++;
+        } catch (e) { fail++; }
+      }
+
+      toast(`${success}명 수정 완료` + (fail > 0 ? `, ${fail}명 실패` : ''));
+      document.getElementById('uv-member-bulk-email').value = '';
+      document.getElementById('uv-member-bulk-batch').value = '';
+      document.getElementById('uv-member-bulk-notes').value = '';
+      cancelUvMemberBulkEdit();
+      await loadUvMembers();
+    }
+
+    // ========== 인증 게이트 ==========
+    // 권한의 실체는 DB 의 RLS(private.is_admin())다. 아래는 UI 게이팅일 뿐이며,
+    // 이걸 우회해도 관리자가 아니면 서버가 어떤 행도 돌려주지 않는다.
+    const gateEl     = document.getElementById('auth-gate');
+    const gateMsgEl  = document.getElementById('gate-msg');
+    const gateLogout = document.getElementById('gate-logout-wrap');
+
+    function gateMessage(msg, isError) {
+      gateMsgEl.textContent = msg;
+      gateMsgEl.className = 'gate-msg ' + (isError ? 'err' : 'info');
+    }
+
+    async function signOutAndReload() {
+      await sb.auth.signOut();
+      window.location.reload();
+    }
+
+    async function checkAdmin(session) {
+      accessToken = session.access_token;
+      const email = session.user && session.user.email;
+      if (!email) { gateMessage('계정에서 이메일을 확인할 수 없습니다.', true); return; }
+
+      // RLS members_select_own 정책에 의해 '본인 행'만 조회된다
+      const { data, error } = await sb
+        .from('uvengers_members')
+        .select('name, email, role')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (error) {
+        gateMessage('권한 확인 실패: ' + error.message, true);
+        gateLogout.classList.remove('hidden');
+        return;
+      }
+      if (!data) {
+        gateMessage(email + ' 은(는) 등록된 회원이 아닙니다.', true);
+        gateLogout.classList.remove('hidden');
+        return;
+      }
+      if (data.role !== 'admin') {
+        gateMessage(email + ' 은(는) 관리자 권한이 없습니다.', true);
+        gateLogout.classList.remove('hidden');
+        return;
+      }
+
+      currentAdmin = data;
+      document.getElementById('admin-email').textContent = email;
+      gateEl.classList.add('hidden');
+      document.getElementById('app-root').classList.remove('hidden');
+      loadUsers();
+    }
+
+    document.getElementById('gate-login').addEventListener('click', async () => {
+      if (window.location.protocol === 'file:') {
+        gateMessage('file:// 로 직접 연 페이지에서는 구글 로그인이 동작하지 않습니다. 배포된 주소나 로컬 서버로 여세요.', true);
+        return;
+      }
+      gateMessage('구글 로그인 창으로 이동합니다...');
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) gateMessage('로그인 시작 실패: ' + error.message, true);
+    });
+
+    // 이메일/비밀번호 로그인 — 구글 계정이 없는 관리자/외부 프로젝트 계정용
+    document.getElementById('gate-pw-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('gate-pw-submit');
+      const email = document.getElementById('gate-email').value.trim();
+      const password = document.getElementById('gate-password').value;
+      if (!email || !password) return;
+      btn.disabled = true;
+      gateMessage('로그인 중...');
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      btn.disabled = false;
+      if (error) { gateMessage('로그인 실패: ' + error.message, true); return; }
+      if (data && data.session) await checkAdmin(data.session);
+    });
+
+    // 비밀번호 재설정 메일 — anon 키로 동작하는 공개 엔드포인트
+    document.getElementById('gate-forgot').addEventListener('click', async () => {
+      const email = document.getElementById('gate-email').value.trim();
+      if (!email) { gateMessage('먼저 이메일을 입력하세요.', true); return; }
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      gateMessage(error ? ('발송 실패: ' + error.message) : (email + ' 로 재설정 메일을 보냈습니다.'), !!error);
+    });
+
+    document.getElementById('gate-logout').addEventListener('click', signOutAndReload);
+    document.getElementById('btn-logout').addEventListener('click', signOutAndReload);
+
+    sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) checkAdmin(session);
+    });
+
+    (async function boot() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) { await checkAdmin(session); return; }
+      gateMessage(window.location.protocol === 'file:'
+        ? 'file:// 로 열면 구글 로그인이 동작하지 않습니다. 배포 주소로 접속하세요.'
+        : '');
+    })();
+  </script>
+</body>
+</html>
