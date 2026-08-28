@@ -35,6 +35,13 @@
     .tab:hover { background: var(--bg3); }
     .tab.active { background: var(--accent); color: #000; font-weight: 600; border-color: var(--accent); }
 
+    /* 서브탭 (한 프로젝트 안의 화면 전환) */
+    .subtabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .subtab { padding: 8px 16px; background: none; border: none; border-bottom: 2px solid transparent;
+              color: var(--text3); cursor: pointer; font-size: 13px; margin-bottom: -1px; transition: all .15s; }
+    .subtab:hover { color: var(--text2); }
+    .subtab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
     /* 카드 */
     .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
     .card h3 { font-size: 16px; margin-bottom: 16px; color: var(--accent); }
@@ -177,13 +184,19 @@
 
     <!-- 탭 -->
     <div class="tabs">
-      <button class="tab active" data-tab="users">사용자 관리</button>
-      <button class="tab" data-tab="sessions">활성 세션</button>
+      <button class="tab active" data-tab="ext">확장프로그램</button>
       <button class="tab" data-tab="uvengers">유벤져스</button>
     </div>
 
     <!-- 사용자 관리 탭 -->
-    <div id="tab-users">
+    <!-- 확장프로그램: grok-pro / flow-pro / genspark-pro / genspark-hub -->
+    <div id="tab-ext">
+      <div class="subtabs">
+        <button class="subtab active" data-group="ext" data-subtab="ext-license">라이선스</button>
+        <button class="subtab" data-group="ext" data-subtab="ext-sessions">활성 세션</button>
+      </div>
+
+    <div id="sub-ext-license">
       <!-- 사용자 추가 -->
       <div class="card">
         <h3>사용자 추가</h3>
@@ -321,8 +334,8 @@
       </div>
     </div>
 
-    <!-- 세션 탭 -->
-    <div id="tab-sessions" class="hidden">
+    <!-- 세션: 위 라이선스와 같은 대상(확장프로그램)이라 같은 탭 안에 둔다 -->
+    <div id="sub-ext-sessions" class="hidden">
       <div class="card">
         <h3>세션 이력 (<span id="session-count">0</span>)</h3>
         <div class="search-bar">
@@ -371,7 +384,9 @@
       </div>
     </div>
 
-    <!-- 유벤져스 가입 신청 관리 탭 -->
+    </div><!-- /tab-ext -->
+
+    <!-- 유벤져스 -->
     <div id="tab-uvengers" class="hidden">
       <!-- 직접 추가 폼 -->
       <div class="card">
@@ -611,18 +626,49 @@
     }
 
     // ========== 탭 전환 ==========
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const target = tab.dataset.tab;
-        document.getElementById('tab-users').classList.toggle('hidden', target !== 'users');
-        document.getElementById('tab-sessions').classList.toggle('hidden', target !== 'sessions');
-        document.getElementById('tab-uvengers').classList.toggle('hidden', target !== 'uvengers');
-        if (target === 'sessions') loadSessions();
-        if (target === 'uvengers') { loadUvInquiries(); loadUvMembers(); }
-      });
-    });
+    // ========== 탭 전환 ==========
+    // 탭은 '프로젝트' 단위로 나눈다. 한 프로젝트 안의 화면 전환은 서브탭으로.
+    //
+    // 새 프로젝트 탭을 추가할 때 이 로직은 건드리지 않는다. 세 가지만 하면 된다:
+    //   1) <button class="tab" data-tab="이름">라벨</button>
+    //   2) <div id="tab-이름" class="hidden"> ... </div>
+    //   3) 열 때 불러올 게 있으면 TAB_LOADERS 에 한 줄
+    const TAB_LOADERS = {
+      ext: () => {
+        const active = document.querySelector('.subtab[data-group="ext"].active');
+        showSubTab(active ? active.dataset.subtab : 'ext-license');
+      },
+      uvengers: () => { loadUvInquiries(); loadUvMembers(); },
+    };
+
+    const SUBTAB_LOADERS = {
+      'ext-license':  () => loadUsers(),
+      'ext-sessions': () => loadSessions(),
+    };
+
+    function showTab(name) {
+      document.querySelectorAll('.tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === name));
+      document.querySelectorAll('[id^="tab-"]').forEach(panel =>
+        panel.classList.toggle('hidden', panel.id !== 'tab-' + name));
+      const load = TAB_LOADERS[name];
+      if (load) load();
+    }
+
+    function showSubTab(name) {
+      const group = name.split('-')[0];
+      document.querySelectorAll('.subtab[data-group="' + group + '"]').forEach(t =>
+        t.classList.toggle('active', t.dataset.subtab === name));
+      document.querySelectorAll('[id^="sub-' + group + '-"]').forEach(panel =>
+        panel.classList.toggle('hidden', panel.id !== 'sub-' + name));
+      const load = SUBTAB_LOADERS[name];
+      if (load) load();
+    }
+
+    document.querySelectorAll('.tab').forEach(tab =>
+      tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+    document.querySelectorAll('.subtab').forEach(tab =>
+      tab.addEventListener('click', () => showSubTab(tab.dataset.subtab)));
 
     // ========== 사용자 목록 ==========
     let usersData = [];
@@ -722,7 +768,7 @@
       const cohort = document.getElementById('add-cohort').value.trim();
       const memo = document.getElementById('add-memo').value.trim();
       const maxSessions = parseInt(document.getElementById('add-max-sessions').value) || 1;
-      const extensions = [...document.querySelectorAll('#tab-users .checkbox-group input:checked')].map(c => c.value);
+      const extensions = [...document.querySelectorAll('#sub-ext-license .checkbox-group input:checked')].map(c => c.value);
 
       if (!email || !email.includes('@')) { toast('올바른 이메일을 입력하세요', 'error'); return; }
       if (extensions.length === 0) { toast('허용 확장프로그램을 선택하세요', 'error'); return; }
@@ -1666,7 +1712,7 @@
       document.getElementById('admin-email').textContent = email;
       gateEl.classList.add('hidden');
       document.getElementById('app-root').classList.remove('hidden');
-      loadUsers();
+      showTab('ext');
     }
 
     document.getElementById('gate-login').addEventListener('click', async () => {
