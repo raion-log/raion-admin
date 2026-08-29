@@ -508,6 +508,75 @@
         <div id="uv-member-empty" class="empty hidden">승인된 멤버가 없습니다.</div>
       </div>
     </div>
+    <!-- ========== UV 에디터 탭 (uv-global-reaction-editor 앱 회원) ========== -->
+    <div id="tab-editor" class="hidden">
+      <div class="subtabs">
+        <button class="subtab active" data-group="editor" data-subtab="editor-members">회원 승인</button>
+        <button class="subtab" data-group="editor" data-subtab="editor-codes">추천코드</button>
+      </div>
+
+      <div id="sub-editor-members">
+        <!-- 승인 대기 -->
+        <div class="card">
+          <h3>가입 승인 대기 (<span id="ed-pending-count">0</span>)</h3>
+          <div style="margin-bottom:10px;">
+            <button class="btn btn-small btn-outline" onclick="loadEditorMembers()">새로고침</button>
+          </div>
+          <table>
+            <thead><tr>
+              <th>이메일</th><th>성함</th><th>연락처끝4</th><th>기수</th><th>유입</th><th>가입일</th><th>승인</th>
+            </tr></thead>
+            <tbody id="ed-pending-body"></tbody>
+          </table>
+          <div id="ed-pending-empty" class="empty hidden">승인 대기 중인 가입자가 없습니다.</div>
+        </div>
+
+        <!-- 승인된 회원 -->
+        <div class="card">
+          <h3>승인된 에디터 회원 (<span id="ed-member-count">0</span>)</h3>
+          <div class="search-bar">
+            <input type="text" id="ed-member-search" placeholder="이메일, 성함으로 검색..." oninput="renderEditorMembers()">
+          </div>
+          <table>
+            <thead><tr>
+              <th>이메일</th><th>성함</th><th>기수</th><th>유형</th><th>상태</th>
+              <th>시작일</th><th>유효기간 / 연장</th><th>기기수</th><th>기기</th><th>관리</th>
+            </tr></thead>
+            <tbody id="ed-member-body"></tbody>
+          </table>
+          <div id="ed-member-empty" class="empty hidden">승인된 회원이 없습니다.</div>
+        </div>
+      </div>
+
+      <div id="sub-editor-codes" class="hidden">
+        <div class="card">
+          <h3>추천 / 이벤트 코드</h3>
+          <p style="color:var(--text3);font-size:13px;margin-bottom:12px;">
+            코드로 가입하면 그 유형(구독·이벤트 등)으로 자동 분류됩니다. 승인은 여전히 직접 하셔야 합니다.<br>
+            코드는 <b>대소문자·앞뒤 공백을 무시</b>하고 인식됩니다(예: <code>test2026</code> = <code>TEST2026</code>). 저장은 대문자로 정규화됩니다.</p>
+          <div class="form-row" style="align-items:flex-end;gap:10px;margin-bottom:14px;">
+            <div class="form-group flex-1"><label>코드</label>
+              <input type="text" id="ed-code-new" placeholder="예: SUMMER2026"></div>
+            <div class="form-group"><label>유형</label>
+              <select id="ed-code-type" style="padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+                <option value="event">이벤트</option>
+                <option value="subscription">구독</option>
+                <option value="staff">내부</option>
+                <option value="student">수강생</option>
+              </select></div>
+            <div class="form-group flex-1"><label>메모</label>
+              <input type="text" id="ed-code-memo" placeholder="선택사항"></div>
+            <button class="btn btn-primary" onclick="addEditorCode()">코드 추가</button>
+          </div>
+          <table>
+            <thead><tr><th>코드</th><th>유형</th><th>메모</th><th>활성</th><th>관리</th></tr></thead>
+            <tbody id="ed-code-body"></tbody>
+          </table>
+          <div id="ed-code-empty" class="empty hidden">등록된 코드가 없습니다.</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- 수정 모달 -->
@@ -551,75 +620,6 @@
       <div class="modal-actions">
         <button class="btn btn-outline" id="edit-cancel">취소</button>
         <button class="btn btn-primary" id="edit-save">저장</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========== UV 에디터 탭 (uv-global-reaction-editor 앱 회원) ========== -->
-  <div id="tab-editor" class="hidden">
-    <div class="subtabs">
-      <button class="subtab active" data-group="editor" data-subtab="editor-members">회원 승인</button>
-      <button class="subtab" data-group="editor" data-subtab="editor-codes">추천코드</button>
-    </div>
-
-    <div id="sub-editor-members">
-      <!-- 승인 대기 -->
-      <div class="card">
-        <h3>가입 승인 대기 (<span id="ed-pending-count">0</span>)</h3>
-        <div style="margin-bottom:10px;">
-          <button class="btn btn-small btn-outline" onclick="loadEditorMembers()">새로고침</button>
-        </div>
-        <table>
-          <thead><tr>
-            <th>이메일</th><th>성함</th><th>연락처끝4</th><th>기수</th><th>유입</th><th>가입일</th><th>승인</th>
-          </tr></thead>
-          <tbody id="ed-pending-body"></tbody>
-        </table>
-        <div id="ed-pending-empty" class="empty hidden">승인 대기 중인 가입자가 없습니다.</div>
-      </div>
-
-      <!-- 승인된 회원 -->
-      <div class="card">
-        <h3>승인된 에디터 회원 (<span id="ed-member-count">0</span>)</h3>
-        <div class="search-bar">
-          <input type="text" id="ed-member-search" placeholder="이메일, 성함으로 검색..." oninput="renderEditorMembers()">
-        </div>
-        <table>
-          <thead><tr>
-            <th>이메일</th><th>성함</th><th>기수</th><th>유형</th><th>상태</th>
-            <th>시작일</th><th>유효기간 / 연장</th><th>기기수</th><th>기기</th><th>관리</th>
-          </tr></thead>
-          <tbody id="ed-member-body"></tbody>
-        </table>
-        <div id="ed-member-empty" class="empty hidden">승인된 회원이 없습니다.</div>
-      </div>
-    </div>
-
-    <div id="sub-editor-codes" class="hidden">
-      <div class="card">
-        <h3>추천 / 이벤트 코드</h3>
-        <p style="color:var(--text3);font-size:13px;margin-bottom:12px;">
-          코드로 가입하면 그 유형(구독·이벤트 등)으로 자동 분류됩니다. 승인은 여전히 직접 하셔야 합니다.<br>
-          코드는 <b>대소문자·앞뒤 공백을 무시</b>하고 인식됩니다(예: <code>test2026</code> = <code>TEST2026</code>). 저장은 대문자로 정규화됩니다.</p>
-        <div class="form-row" style="align-items:flex-end;gap:10px;margin-bottom:14px;">
-          <div class="form-group flex-1"><label>코드</label>
-            <input type="text" id="ed-code-new" placeholder="예: SUMMER2026"></div>
-          <div class="form-group"><label>유형</label>
-            <select id="ed-code-type" style="padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-              <option value="event">이벤트</option>
-              <option value="subscription">구독</option>
-              <option value="staff">내부</option>
-              <option value="student">수강생</option>
-            </select></div>
-          <div class="form-group flex-1"><label>메모</label>
-            <input type="text" id="ed-code-memo" placeholder="선택사항"></div>
-          <button class="btn btn-primary" onclick="addEditorCode()">코드 추가</button>
-        </div>
-        <table>
-          <thead><tr><th>코드</th><th>유형</th><th>메모</th><th>활성</th><th>관리</th></tr></thead>
-          <tbody id="ed-code-body"></tbody>
-        </table>
-        <div id="ed-code-empty" class="empty hidden">등록된 코드가 없습니다.</div>
       </div>
     </div>
   </div>
