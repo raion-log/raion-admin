@@ -63,9 +63,18 @@
   const err = hash.get('error_description') || query.get('error_description')
            || hash.get('error') || query.get('error');
 
+  // Supabase 오류 문구는 영문으로 온다. 흔한 것만 한국어로 바꿔준다.
+  function ko(raw) {
+    const t = decodeURIComponent(raw).replace(/\+/g, ' ');
+    if (/invalid or has expired/i.test(t)) return '링크가 만료되었거나 이미 사용되었습니다.';
+    if (/expired/i.test(t))                return '링크가 만료되었습니다.';
+    if (/already .*confirm/i.test(t))      return '이미 확인이 완료된 계정입니다.';
+    if (/access_denied|denied/i.test(t))   return '확인 요청이 거부되었습니다.';
+    return t;
+  }
   if (err) {
-    show('⚠️', '확인하지 못했습니다', decodeURIComponent(err).replace(/\+/g, ' '), false,
-         '링크가 만료되었을 수 있습니다. 앱에서 다시 가입하거나 관리자에게 문의해 주세요.');
+    show('⚠️', '확인하지 못했습니다', ko(err), false,
+         '앱에서 다시 가입하시거나, 이미 확인하셨다면 그대로 로그인해 보세요. 계속 안 되면 관리자에게 문의해 주세요.');
   } else {
     // 세션이 잡히면 확실히 성공. 안 잡혀도 서버에서 확인이 끝난 경우가 있어 성공으로 안내한다.
     sb.auth.getSession().then(({ data: { session } }) => {
