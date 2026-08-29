@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이메일 확인 완료 · UV</title>
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--text:#e8e8e8;--text2:#b0b0b0;--text3:#707070;
+        --border:#2a2a2a;--accent:#FFD700;--red:#e94560;--green:#27ae60}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);
+       color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px 36px;
+       width:min(460px,92vw);text-align:center}
+  .mark{font-size:44px;line-height:1;margin-bottom:16px}
+  h1{font-size:21px;margin-bottom:10px}
+  h1 span{color:var(--accent);font-weight:800}
+  p{color:var(--text2);font-size:14px;line-height:1.75}
+  .steps{background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+         padding:16px 18px;margin-top:22px;text-align:left;font-size:13px;color:var(--text2);line-height:1.9}
+  .steps b{color:var(--accent)}
+  .note{margin-top:18px;font-size:12px;color:var(--text3);line-height:1.7}
+  .err{color:var(--red)}
+</style>
+</head>
+<body>
+  <div class="box" id="box">
+    <div class="mark" id="mark">⏳</div>
+    <h1 id="title">확인 중...</h1>
+    <p id="desc">잠시만 기다려 주세요.</p>
+    <div class="steps hidden" id="steps">
+      <div>다음 순서로 진행하시면 됩니다.</div>
+      <div>1. <b>UV 에디터 앱</b>으로 돌아가기</div>
+      <div>2. 방금 가입한 계정으로 <b>로그인</b></div>
+      <div>3. 관리자 <b>승인</b> 후 이용 가능</div>
+    </div>
+    <p class="note" id="note"></p>
+  </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+  // 가입 확인 메일의 링크가 돌아오는 곳.
+  // Supabase 가 인증 처리를 마친 뒤 이 페이지로 보낸다. 여기서는 결과만 알려준다.
+  const sb = window.supabase.createClient(
+    'https://dnflcjpjzqmrybtcleqy.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuZmxjanBqenFtcnlidGNsZXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NTIyMjUsImV4cCI6MjA4OTAyODIyNX0._g01argDVGK1Wmm0GT-ThidWu33ls--IR-7F20_zJF8',
+    { auth: { detectSessionInUrl: true, persistSession: false } }
+  );
+  const $ = id => document.getElementById(id);
+  function show(mark, title, desc, ok, note) {
+    $('mark').textContent = mark;
+    $('title').textContent = title;
+    $('desc').textContent = desc;
+    $('desc').className = ok ? '' : 'err';
+    if (ok) $('steps').classList.remove('hidden');
+    $('note').textContent = note || '';
+  }
+  // 실패는 쿼리스트링이나 해시에 error 로 온다
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const query = new URLSearchParams(location.search);
+  const err = hash.get('error_description') || query.get('error_description')
+           || hash.get('error') || query.get('error');
+
+  if (err) {
+    show('⚠️', '확인하지 못했습니다', decodeURIComponent(err).replace(/\+/g, ' '), false,
+         '링크가 만료되었을 수 있습니다. 앱에서 다시 가입하거나 관리자에게 문의해 주세요.');
+  } else {
+    // 세션이 잡히면 확실히 성공. 안 잡혀도 서버에서 확인이 끝난 경우가 있어 성공으로 안내한다.
+    sb.auth.getSession().then(({ data: { session } }) => {
+      show('✅', '이메일 확인이 완료되었습니다',
+           session ? '계정이 활성화되었습니다.' : '계정 확인이 처리되었습니다.',
+           true, '이 창은 닫으셔도 됩니다.');
+    }).catch(() => {
+      show('✅', '이메일 확인이 완료되었습니다', '계정 확인이 처리되었습니다.', true, '이 창은 닫으셔도 됩니다.');
+    });
+  }
+</script>
+<style>.hidden{display:none}</style>
+</body>
+</html>
