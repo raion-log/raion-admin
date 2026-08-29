@@ -208,7 +208,7 @@
           </div>
           <div class="form-group">
             <label>기수</label>
-            <input type="text" id="add-cohort" placeholder="예: 1기" style="width: 80px;">
+            <input type="text" id="add-cohort" placeholder="예: 유유스 1기" style="width: 80px;">
           </div>
           <div class="form-group">
             <label>메모</label>
@@ -301,7 +301,7 @@
             <label><input type="checkbox" value="jp-eco"> JP Eco</label>
           </div>
           <input type="number" id="bulk-edit-sessions" placeholder="동시접속" min="0" style="width: 80px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
-          <input type="text" id="bulk-edit-cohort" placeholder="기수" style="width: 80px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
+          <input type="text" id="bulk-edit-cohort" placeholder="예: 유유스 1기" style="width: 80px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px;">
           <button class="btn btn-small btn-primary" id="bulk-edit-apply">일괄 적용</button>
           <button class="btn btn-small btn-outline" id="bulk-edit-cancel">취소</button>
         </div>
@@ -564,12 +564,14 @@
                 <option value="staff">내부</option>
                 <option value="student">수강생</option>
               </select></div>
+            <div class="form-group"><label>기수</label>
+              <input type="text" id="ed-code-cohort" placeholder="예: 유유스 1기" style="width:120px;"></div>
             <div class="form-group flex-1"><label>메모</label>
               <input type="text" id="ed-code-memo" placeholder="선택사항"></div>
             <button class="btn btn-primary" onclick="addEditorCode()">코드 추가</button>
           </div>
           <table>
-            <thead><tr><th>코드</th><th>유형</th><th>메모</th><th>활성</th><th>관리</th></tr></thead>
+            <thead><tr><th>코드</th><th>유형</th><th>기수</th><th>메모</th><th>활성</th><th>관리</th></tr></thead>
             <tbody id="ed-code-body"></tbody>
           </table>
           <div id="ed-code-empty" class="empty hidden">등록된 코드가 없습니다.</div>
@@ -611,7 +613,7 @@
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label>기수</label>
-        <input type="text" id="edit-cohort" placeholder="예: 1기">
+        <input type="text" id="edit-cohort" placeholder="예: 유유스 1기">
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label>메모</label>
@@ -1994,6 +1996,7 @@
       tbody.innerHTML = editorCodes.map(c => `<tr>
         <td style="font-weight:600;">${edEsc(c.code)}</td>
         <td>${typeLabel[c.member_type] || edEsc(c.member_type)}</td>
+        <td><input type="text" value="${edEsc(c.cohort || '')}" placeholder="예: 유유스 1기" style="${st}width:120px;" onchange="updateEditorCode('${edEsc(c.code)}', { cohort: this.value.trim() || null })"></td>
         <td><input type="text" value="${edEsc(c.memo || '')}" style="${st}width:160px;" onchange="updateEditorCode('${edEsc(c.code)}', { memo: this.value })"></td>
         <td><button class="btn btn-small ${c.active ? 'btn-primary' : 'btn-outline'}" onclick="updateEditorCode('${edEsc(c.code)}', { active: ${!c.active} })">${c.active ? '활성' : '비활성'}</button></td>
         <td class="actions"><button class="btn btn-small btn-danger" onclick="deleteEditorCode('${edEsc(c.code)}')">삭제</button></td>
@@ -2003,11 +2006,15 @@
       const code = document.getElementById('ed-code-new').value.trim();
       const member_type = document.getElementById('ed-code-type').value;
       const memo = document.getElementById('ed-code-memo').value.trim();
+      // 기수는 이 코드로 가입한 회원에게 서버가 붙여준다. 회원이 직접 타이핑하지 않는다
+      const cohort = document.getElementById('ed-code-cohort').value.trim();
       if (!code) { toast('코드를 입력하세요', 'error'); return; }
       try {
-        await supabasePost('uvengers_editor_codes', { code, member_type, memo: memo || null, active: true });
+        await supabasePost('uvengers_editor_codes',
+          { code, member_type, cohort: cohort || null, memo: memo || null, active: true });
         toast('코드 추가됨', 'success');
         document.getElementById('ed-code-new').value = '';
+        document.getElementById('ed-code-cohort').value = '';
         document.getElementById('ed-code-memo').value = '';
         await loadEditorCodes();
       } catch (e) { toast('코드 추가 실패: ' + e.message, 'error'); }
