@@ -1854,8 +1854,46 @@
     function edInput() { return "padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;"; }
     function edEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+    // 기수 목록은 서버가 들고 있다(uvengers_editor_cohorts). 늘려도 콘솔 재배포가 필요 없다
+    let editorCohorts = [];
+    async function loadEditorCohortList() {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/list_editor_cohorts`, {
+          method: 'POST', headers: apiHeaders(), body: '{}' });
+        editorCohorts = (await res.json() || []).map(r => r.name);
+      } catch (e) { editorCohorts = []; }
+    }
+
+    // 관리자용 기수 선택칸. 목록에 없는 기존 값도 잃지 않게 항목으로 함께 넣는다
+    function edCohortSelect(m) {
+      const cur = m.cohort || '';
+      const opts = [...new Set([...editorCohorts, cur].filter(Boolean))];
+      return `<select style="${edInput()}width:110px;"
+        onchange="updateEditorMember('${m.id}', { cohort: this.value || null })">
+        <option value=""${cur ? '' : ' selected'}>(없음)</option>
+        ${opts.map(o => `<option value="${edEsc(o)}"${o === cur ? ' selected' : ''}>${edEsc(o)}</option>`).join('')}
+      </select>`;
+    }
+    function edTypeSelect(m) {
+      const types = [['student','수강생'],['subscription','구독'],['staff','내부'],['event','이벤트']];
+      return `<select style="${edInput()}width:88px;"
+        onchange="updateEditorMember('${m.id}', { member_type: this.value })">
+        ${types.map(([v,l]) => `<option value="${v}"${m.member_type===v?' selected':''}>${l}</option>`).join('')}
+      </select>`;
+    }
+    function edNameInput(m) {
+      return `<input type="text" value="${edEsc(m.name || '')}" placeholder="성함" style="${edInput()}width:92px;"
+        onchange="updateEditorMember('${m.id}', { name: this.value.trim() || null })">`;
+    }
+    function edPhoneInput(m) {
+      return `<input type="text" value="${edEsc(m.phone_last4 || '')}" placeholder="끝4자리" maxlength="4"
+        style="${edInput()}width:58px;text-align:center;"
+        onchange="updateEditorMember('${m.id}', { phone_last4: this.value.trim() || null })">`;
+    }
+
     async function loadEditorMembers() {
       try {
+        await loadEditorCohortList();
         editorMembers = await supabaseGet('uvengers_editor_members', 'order=created_at.desc');
         editorDevices = await supabaseGet('uvengers_editor_devices', 'order=last_seen.desc');
         renderEditorPending();
@@ -1895,10 +1933,10 @@
         const created = m.created_at ? new Date(m.created_at).toLocaleDateString('ko-KR') : '-';
         return `<tr>
           <td style="font-size:12px;">${edEsc(m.email)}</td>
-          <td>${edEsc(m.name || '-')}</td>
-          <td>${edEsc(m.phone_last4 || '-')}</td>
-          <td>${edEsc(m.cohort || '-')}</td>
-          <td>${edTypeBadge(m) || '<span style="font-size:11px;color:var(--text3);">-</span>'}</td>
+          <td>${edNameInput(m)}</td>
+          <td>${edPhoneInput(m)}</td>
+          <td>${edCohortSelect(m)}</td>
+          <td>${edTypeSelect(m)}</td>
           <td>${created}</td>
           <td class="actions" style="white-space:nowrap;">
             <input type="number" id="ed-dur-${m.id}" value="1" min="1" style="${st}width:44px;text-align:center;">
@@ -1940,9 +1978,9 @@
         }).join('') : '<span style="font-size:11px;color:var(--text3);">없음</span>';
         return `<tr>
           <td style="font-size:12px;">${edEsc(m.email)}</td>
-          <td>${edEsc(m.name || '-')}</td>
-          <td>${edEsc(m.cohort || '-')}</td>
-          <td>${typeBadge}</td>
+          <td>${edNameInput(m)}</td>
+          <td>${edCohortSelect(m)}</td>
+          <td>${edTypeSelect(m)}</td>
           <td><span class="badge ${statusClass}">${statusText}</span></td>
           <td style="font-size:11px;color:var(--text3);">${startDate}</td>
           <td>
