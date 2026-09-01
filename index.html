@@ -519,11 +519,29 @@
         <!-- 승인 대기 -->
         <div class="card">
           <h3>가입 승인 대기 (<span id="ed-pending-count">0</span>)</h3>
-          <div style="margin-bottom:10px;">
+          <div class="search-bar" style="margin-bottom:10px;">
+            <input type="text" id="ed-pending-search" placeholder="이메일, 성함, 기수로 검색..." oninput="renderEditorPending()">
             <button class="btn btn-small btn-outline" onclick="loadEditorMembers()">새로고침</button>
+            <button class="btn btn-small btn-outline" onclick="edExportCsv('pending')">CSV</button>
+          </div>
+          <!-- 선택된 건에만 적용되는 일괄 처리. 선택이 없으면 숨는다 -->
+          <div class="hidden" id="ed-pending-bulk" style="padding:10px 12px;background:var(--bg3);border:1px solid var(--accent);border-radius:8px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:13px;color:var(--accent);font-weight:600;"><span id="ed-pending-selcount">0</span>명 선택</span>
+            <span style="color:var(--text3);">|</span>
+            <input type="number" id="ed-bulk-dur" value="1" min="1" style="width:52px;text-align:center;padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            <select id="ed-bulk-unit" style="padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option>
+            </select>
+            <button class="btn btn-small btn-primary" onclick="edBulkApprove()">선택 승인</button>
+            <button class="btn btn-small btn-danger" onclick="edBulkStatus('pending','blocked')">선택 거부</button>
+            <span style="color:var(--text3);">|</span>
+            <select id="ed-bulk-cohort" style="padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);"></select>
+            <button class="btn btn-small btn-outline" onclick="edBulkField('pending','cohort')">기수 적용</button>
+            <button class="btn btn-small btn-outline" onclick="edClearSel('pending')">선택 해제</button>
           </div>
           <table>
             <thead><tr>
+              <th style="width:28px;"><input type="checkbox" onchange="edToggleAll('pending', this.checked)"></th>
               <th>이메일</th><th>성함</th><th>연락처끝4</th><th>기수</th><th>유입</th><th>가입일</th><th>승인</th>
             </tr></thead>
             <tbody id="ed-pending-body"></tbody>
@@ -535,10 +553,40 @@
         <div class="card">
           <h3>승인된 에디터 회원 (<span id="ed-member-count">0</span>)</h3>
           <div class="search-bar">
-            <input type="text" id="ed-member-search" placeholder="이메일, 성함으로 검색..." oninput="renderEditorMembers()">
+            <input type="text" id="ed-member-search" placeholder="이메일, 성함, 기수로 검색..." oninput="renderEditorMembers()">
+            <select id="ed-member-filter" onchange="renderEditorMembers()"
+              style="padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              <option value="">전체</option>
+              <option value="expiring">만료 임박 (7일 이내)</option>
+              <option value="expired">만료됨</option>
+              <option value="blocked">차단됨</option>
+              <option value="nocohort">기수 없음</option>
+            </select>
+            <button class="btn btn-small btn-outline" onclick="edExportCsv('member')">CSV</button>
+          </div>
+          <div class="hidden" id="ed-member-bulk" style="padding:10px 12px;background:var(--bg3);border:1px solid var(--accent);border-radius:8px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:13px;color:var(--accent);font-weight:600;"><span id="ed-member-selcount">0</span>명 선택</span>
+            <span style="color:var(--text3);">|</span>
+            <input type="number" id="ed-mbulk-dur" value="1" min="1" style="width:52px;text-align:center;padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            <select id="ed-mbulk-unit" style="padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option>
+            </select>
+            <button class="btn btn-small btn-primary" onclick="edBulkExtend()">선택 연장</button>
+            <span style="color:var(--text3);">|</span>
+            <select id="ed-mbulk-cohort" style="padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);"></select>
+            <button class="btn btn-small btn-outline" onclick="edBulkField('member','cohort')">기수</button>
+            <select id="ed-mbulk-type" style="padding:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <option value="student">수강생</option><option value="subscription">구독</option>
+              <option value="staff">내부</option><option value="event">이벤트</option>
+            </select>
+            <button class="btn btn-small btn-outline" onclick="edBulkField('member','member_type')">유형</button>
+            <span style="color:var(--text3);">|</span>
+            <button class="btn btn-small btn-danger" onclick="edBulkStatus('member','blocked')">선택 차단</button>
+            <button class="btn btn-small btn-outline" onclick="edClearSel('member')">선택 해제</button>
           </div>
           <table>
             <thead><tr>
+              <th style="width:28px;"><input type="checkbox" onchange="edToggleAll('member', this.checked)"></th>
               <th>이메일</th><th>성함</th><th>기수</th><th>유형</th><th>상태</th>
               <th>시작일</th><th>유효기간 / 연장</th><th>기기수</th><th>기기</th><th>관리</th>
             </tr></thead>
@@ -1891,6 +1939,109 @@
         onchange="updateEditorMember('${m.id}', { phone_last4: this.value.trim() || null })">`;
     }
 
+    // ── 선택 상태 (두 목록이 각자 보유) ──
+    const edSel = { pending: new Set(), member: new Set() };
+    let edPendingView = [], edMemberView = [];   // 현재 화면에 보이는 행 (전체선택 대상)
+
+    function edRowsOf(kind) { return kind === 'pending' ? edPendingView : edMemberView; }
+    function edToggle(kind, id, on) { on ? edSel[kind].add(id) : edSel[kind].delete(id); edSyncBar(kind); }
+    function edToggleAll(kind, on) {
+      // '전체선택' 은 검색·필터로 걸러진 **보이는 행**에만 적용한다.
+      // 안 보이는 행까지 선택되면 의도치 않은 대상에 일괄 적용된다
+      edRowsOf(kind).forEach(m => on ? edSel[kind].add(m.id) : edSel[kind].delete(m.id));
+      kind === 'pending' ? renderEditorPending() : renderEditorMembers();
+    }
+    function edClearSel(kind) {
+      edSel[kind].clear();
+      kind === 'pending' ? renderEditorPending() : renderEditorMembers();
+    }
+    function edSyncBar(kind) {
+      const n = edSel[kind].size;
+      const bar = document.getElementById(kind === 'pending' ? 'ed-pending-bulk' : 'ed-member-bulk');
+      const cnt = document.getElementById(kind === 'pending' ? 'ed-pending-selcount' : 'ed-member-selcount');
+      if (cnt) cnt.textContent = n;
+      if (bar) bar.classList.toggle('hidden', n === 0);
+    }
+    function edCheckbox(kind, m) {
+      return `<input type="checkbox" ${edSel[kind].has(m.id) ? 'checked' : ''}
+        onchange="edToggle('${kind}','${m.id}', this.checked)">`;
+    }
+    function edFillCohortSelects() {
+      const opts = '<option value="">(없음)</option>' +
+        editorCohorts.map(c => `<option value="${edEsc(c)}">${edEsc(c)}</option>`).join('');
+      ['ed-bulk-cohort','ed-mbulk-cohort'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.innerHTML = opts;
+      });
+    }
+
+    // 일괄 처리 공통 — 한 건씩 보내고 성공/실패를 세어 보고한다.
+    // 하나가 실패해도 나머지는 계속 진행한다. 중간에 멈추면 어디까지 됐는지 알 수 없다
+    async function edBulkRun(kind, label, buildUpdate) {
+      const ids = [...edSel[kind]];
+      if (!ids.length) { toast('선택된 대상이 없습니다', 'error'); return; }
+      if (!confirm(`${ids.length}명에게 '${label}' 을 적용할까요?`)) return;
+      let ok = 0; const fails = [];
+      for (const id of ids) {
+        try {
+          const res = await supabasePatch('uvengers_editor_members', id, buildUpdate(id));
+          Array.isArray(res) && res.length ? ok++ : fails.push(id);
+        } catch (e) { fails.push(id); }
+      }
+      edSel[kind].clear();
+      await loadEditorMembers();
+      toast(fails.length ? `${ok}명 적용, ${fails.length}명 실패` : `${ok}명 적용 완료`,
+            fails.length ? 'error' : 'success');
+    }
+
+    async function edBulkApprove() {
+      const amount = parseInt(document.getElementById('ed-bulk-dur').value) || 1;
+      const unit = document.getElementById('ed-bulk-unit').value;
+      const now = new Date();
+      await edBulkRun('pending', '승인', () => ({
+        status: 'approved', started_at: now.toISOString(), valid_until: edAddPeriod(now, amount, unit) }));
+    }
+    async function edBulkExtend() {
+      const amount = parseInt(document.getElementById('ed-mbulk-dur').value) || 1;
+      const unit = document.getElementById('ed-mbulk-unit').value;
+      // 만료 전이면 남은 기간에 얹고, 이미 지났으면 오늘부터 센다
+      await edBulkRun('member', '기간 연장', (id) => {
+        const m = editorMembers.find(x => x.id === id);
+        const base = (m && m.valid_until && new Date(m.valid_until) > new Date()) ? new Date(m.valid_until) : new Date();
+        return { valid_until: edAddPeriod(base, amount, unit) };
+      });
+    }
+    async function edBulkStatus(kind, status) {
+      await edBulkRun(kind, status === 'blocked' ? '차단/거부' : status, () => ({ status }));
+    }
+    async function edBulkField(kind, field) {
+      const sel = document.getElementById(
+        kind === 'pending' ? 'ed-bulk-cohort' : (field === 'cohort' ? 'ed-mbulk-cohort' : 'ed-mbulk-type'));
+      const val = sel ? sel.value : '';
+      const label = field === 'cohort' ? `기수 = ${val || '(없음)'}` : `유형 = ${val}`;
+      await edBulkRun(kind, label, () => ({ [field]: val || null }));
+    }
+
+    // 만료 상태 — 구독 운영에서 가장 자주 봐야 하는 값
+    function edExpiryInfo(m) {
+      if (!m.valid_until) return { cls: 'badge-registered', text: '기간 없음', days: null };
+      const days = Math.ceil((new Date(m.valid_until) - new Date()) / 86400000);
+      if (days < 0)  return { cls: 'badge-inactive', text: `만료 ${-days}일 지남`, days };
+      if (days <= 7) return { cls: 'badge-pending',  text: `D-${days}`, days };
+      return { cls: 'badge-active', text: `${days}일 남음`, days };
+    }
+
+    function edExportCsv(kind) {
+      const rows = edRowsOf(kind);
+      if (!rows.length) { toast('내보낼 행이 없습니다', 'error'); return; }
+      const cols = ['email','name','phone_last4','cohort','member_type','status','started_at','valid_until','max_devices'];
+      const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+      const csv = '\uFEFF' + [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      a.download = `uv-editor-${kind}-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click(); URL.revokeObjectURL(a.href);
+    }
+
     async function loadEditorMembers() {
       try {
         await loadEditorCohortList();
@@ -1922,8 +2073,15 @@
     }
 
     function renderEditorPending() {
-      const pending = editorMembers.filter(m => m.status === 'pending');
-      document.getElementById('ed-pending-count').textContent = pending.length;
+      const q = (document.getElementById('ed-pending-search')?.value || '').toLowerCase();
+      const all = editorMembers.filter(m => m.status === 'pending');
+      const pending = all.filter(m => !q ||
+        (m.email||'').toLowerCase().includes(q) || (m.name||'').toLowerCase().includes(q) ||
+        (m.cohort||'').toLowerCase().includes(q));
+      edPendingView = pending;                       // 전체선택·CSV 는 보이는 행만 대상
+      edFillCohortSelects(); edSyncBar('pending');
+      document.getElementById('ed-pending-count').textContent =
+        all.length + (pending.length !== all.length ? ` / 검색 ${pending.length}` : '');
       const tbody = document.getElementById('ed-pending-body');
       const empty = document.getElementById('ed-pending-empty');
       if (!pending.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
@@ -1932,6 +2090,7 @@
       tbody.innerHTML = pending.map(m => {
         const created = m.created_at ? new Date(m.created_at).toLocaleDateString('ko-KR') : '-';
         return `<tr>
+          <td>${edCheckbox('pending', m)}</td>
           <td style="font-size:12px;">${edEsc(m.email)}</td>
           <td>${edNameInput(m)}</td>
           <td>${edPhoneInput(m)}</td>
@@ -1949,9 +2108,23 @@
 
     function renderEditorMembers() {
       const search = (document.getElementById('ed-member-search').value || '').toLowerCase();
+      const mode = document.getElementById('ed-member-filter')?.value || '';
       const approved = editorMembers.filter(m => m.status !== 'pending');
-      const filtered = approved.filter(m => !search || (m.email||'').toLowerCase().includes(search) || (m.name||'').toLowerCase().includes(search));
-      document.getElementById('ed-member-count').textContent = approved.length;
+      const filtered = approved.filter(m => {
+        if (search && !((m.email||'').toLowerCase().includes(search) ||
+                        (m.name||'').toLowerCase().includes(search) ||
+                        (m.cohort||'').toLowerCase().includes(search))) return false;
+        const d = edExpiryInfo(m).days;
+        if (mode === 'expiring') return m.status === 'approved' && d !== null && d >= 0 && d <= 7;
+        if (mode === 'expired')  return d !== null && d < 0;
+        if (mode === 'blocked')  return m.status === 'blocked';
+        if (mode === 'nocohort') return !m.cohort;
+        return true;
+      });
+      edMemberView = filtered;
+      edFillCohortSelects(); edSyncBar('member');
+      document.getElementById('ed-member-count').textContent =
+        approved.length + (filtered.length !== approved.length ? ` / 표시 ${filtered.length}` : '');
       const tbody = document.getElementById('ed-member-body');
       const empty = document.getElementById('ed-member-empty');
       if (!filtered.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
@@ -1977,6 +2150,7 @@
           return `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;"><span style="font-size:11px;color:var(--text3);">${label} (${seen})</span><button class="btn btn-small btn-outline" style="padding:1px 6px;font-size:10px;" onclick="removeEditorDevice('${d.id}')">해제</button></div>`;
         }).join('') : '<span style="font-size:11px;color:var(--text3);">없음</span>';
         return `<tr>
+          <td>${edCheckbox('member', m)}</td>
           <td style="font-size:12px;">${edEsc(m.email)}</td>
           <td>${edNameInput(m)}</td>
           <td>${edCohortSelect(m)}</td>
@@ -1984,7 +2158,8 @@
           <td><span class="badge ${statusClass}">${statusText}</span></td>
           <td style="font-size:11px;color:var(--text3);">${startDate}</td>
           <td>
-            <input type="date" value="${vuDate}" style="${st}" onchange="setEditorValidUntil('${m.id}', this.value)"><br>${vuNote}
+            <input type="date" value="${vuDate}" style="${st}" onchange="setEditorValidUntil('${m.id}', this.value)">
+            <span class="badge ${edExpiryInfo(m).cls}" style="font-size:10px;margin-left:4px;">${edExpiryInfo(m).text}</span><br>${vuNote}
             <div style="display:flex;gap:2px;margin-top:3px;align-items:center;">
               <input type="number" id="ed-ext-dur-${m.id}" value="1" min="1" style="${st}width:38px;text-align:center;">
               <select id="ed-ext-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
