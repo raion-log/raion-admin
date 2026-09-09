@@ -8,6 +8,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="academy-admin.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -187,6 +188,7 @@
       <button class="tab active" data-tab="ext">확장프로그램</button>
       <button class="tab" data-tab="uvengers">유벤져스</button>
       <button class="tab" data-tab="editor">UV 에디터</button>
+      <button class="tab" data-tab="academy">유유스 학습실</button>
     </div>
 
     <!-- 사용자 관리 탭 -->
@@ -637,6 +639,15 @@
 
   </div>
 
+  <!-- The panel stays inside the existing authenticated app, not a separate console. -->
+  <script>
+    const academyPanel = document.createElement('section');
+    academyPanel.id = 'tab-academy';
+    academyPanel.className = 'hidden academy-admin';
+    academyPanel.setAttribute('aria-label', '유유스 학습실 관리');
+    document.getElementById('app-root').appendChild(academyPanel);
+  </script>
+
   <!-- 수정 모달 -->
   <div class="modal-overlay hidden" id="edit-modal">
     <div class="modal">
@@ -684,6 +695,7 @@
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="academy-admin.js"></script>
   <script>
     // ========== Supabase 설정 ==========
     // service_role 키는 제거됨. 브라우저에는 공개키(anon)만 두고,
@@ -696,6 +708,13 @@
     });
 
     let accessToken = null;   // 로그인 후 채워짐
+    const academyAdmin = window.createAcademyAdmin(sb, document.getElementById('tab-academy'));
+    let academyIdentity = null;
+    function syncAcademyIdentity(session) {
+      const nextIdentity = session?.user?.id || null;
+      if (nextIdentity !== academyIdentity || !nextIdentity) academyAdmin.clear();
+      academyIdentity = nextIdentity;
+    }
     let currentAdmin = null;  // { email, name }
 
     function apiHeaders(extra) {
@@ -762,6 +781,7 @@
     //   2) <div id="tab-이름" class="hidden"> ... </div>
     //   3) 열 때 불러올 게 있으면 TAB_LOADERS 에 한 줄
     const TAB_LOADERS = {
+      academy: () => academyAdmin.load(),
       ext: () => {
         const active = document.querySelector('.subtab[data-group="ext"].active');
         showSubTab(active ? active.dataset.subtab : 'ext-license');
@@ -1815,6 +1835,7 @@
     }
 
     async function checkAdmin(session) {
+      syncAcademyIdentity(session);
       accessToken = session.access_token;
       const email = session.user && session.user.email;
       if (!email) { gateMessage('계정에서 이메일을 확인할 수 없습니다.', true); return; }
@@ -1891,6 +1912,7 @@
     document.getElementById('btn-logout').addEventListener('click', signOutAndReload);
 
     sb.auth.onAuthStateChange((event, session) => {
+      syncAcademyIdentity(session);
       if (event === 'SIGNED_IN' && session) checkAdmin(session);
     });
 
