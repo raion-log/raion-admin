@@ -12,7 +12,6 @@
       return node;
     };
     const errorMessage = (error) => {
-      if (error?.message === 'academy_mfa_required') return '학습실 관리는 관리자 2단계 인증 후 이용할 수 있습니다. 관리자 인증 설정을 확인해주세요.';
       if (error?.message === 'academy_session_required') return '로그인 세션이 만료되었거나 종료되었습니다. 다시 로그인해주세요.';
       if (error?.code === '42501') return '학습실 관리 권한을 확인하지 못했습니다. 학습실 전용 관리자 등록을 확인해주세요.';
       if (error?.code === 'PGRST202' || error?.code === '42883') return '학습실 DB API가 아직 적용되지 않았습니다. DB 적용·권한 검증 후 다시 불러오세요.';
@@ -57,7 +56,7 @@
     }
     function shell() {
       root.replaceChildren(el('h2', '유유스 학습실 관리'),
-        el('p', '기수와 수강 명단을 먼저 등록한 뒤 신청을 대조합니다. 명단·승인 변경은 학습실에만 적용됩니다. 관리자 2단계 인증은 중앙 로그인 계정에 보안 수단을 추가하며, 등록 완료 시 다른 기기의 로그인 세션이 종료될 수 있습니다.', 'academy-notice'),
+        el('p', '기수와 수강 명단을 먼저 등록한 뒤 신청을 대조합니다. 명단·승인 변경은 학습실에만 적용되며, 로그인된 학습실 전용 관리자만 이용할 수 있습니다.', 'academy-notice'),
         button('다시 불러오기', () => load()), status);
     }
     function disabled(value) {
@@ -74,85 +73,6 @@
       input.type = 'text'; input.maxLength = 300; input.required = true;
       input.placeholder = '예: 수강 명단과 신청 정보를 확인함';
       return input;
-    }
-    async function verifyMfaCode(factorId, code) {
-      const challenge = await bounded(client.auth.mfa.challenge({ factorId }));
-      if (challenge.error) throw challenge.error;
-      const verified = await bounded(client.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code }));
-      if (verified.error) throw verified.error;
-    }
-    function showMfaChallenge(factor, token) {
-      const section = el('section'); section.append(el('h3', '관리자 2단계 인증'), el('p', '인증 앱에 표시된 6자리 코드를 입력해야 학습실 수강생 정보를 볼 수 있습니다.', 'academy-notice'));
-      const code = el('input'); code.type = 'text'; code.inputMode = 'numeric'; code.autocomplete = 'one-time-code'; code.maxLength = 6; code.placeholder = '인증 앱의 6자리 코드';
-      const action = button('2단계 인증 확인', async () => {
-        if (!/^[0-9]{6}$/.test(code.value)) { message('인증 앱에 표시된 6자리 코드를 입력해주세요.', true); code.focus(); return; }
-        disabled(true); message('2단계 인증을 확인하고 있습니다.');
-        try { await verifyMfaCode(factor.id, code.value); if (token === epoch) await load('2단계 인증을 확인했습니다.'); }
-        catch { if (token === epoch) { message('코드를 확인하지 못했습니다. 새 코드를 확인해 다시 입력해주세요.', true); disabled(false); code.focus(); } }
-      });
-      section.append(field('6자리 인증 코드', code), action); root.appendChild(section);
-    }
-    function showMfaEnrollment(token) {
-      const section = el('section'); section.append(el('h3', '관리자 2단계 인증 등록'), el('p', '학습실 관리를 처음 이용할 때만 인증 앱을 등록합니다. Google Authenticator 같은 인증 앱을 준비해주세요.', 'academy-notice'));
-      section.appendChild(button('인증 앱 등록 시작', async () => {
-        disabled(true); message('등록용 QR 코드를 만들고 있습니다.');
-        try {
-          const enrolled = await bounded(client.auth.mfa.enroll({ factorType: 'totp', friendlyName: '유유스 학습실 관리자' }));
-          if (enrolled.error) throw enrolled.error;
-          if (token !== epoch) return;
-          section.replaceChildren(el('h3', '관리자 2단계 인증 등록'), el('p', '인증 앱에서 QR 코드를 스캔한 뒤 앱에 표시된 6자리 코드를 입력하세요.', 'academy-notice'));
-          const qr = el('img'); qr.src = enrolled.data.totp.qr_code; qr.alt = '인증 앱 등록용 QR 코드'; qr.className = 'academy-mfa-qr';
-          const secret = el('code', enrolled.data.totp.secret, 'academy-mfa-secret');
-          section.append(qr, el('p', 'QR 인식이 어려우면 아래 설정 키를 인증 앱에 직접 입력하세요.'), secret);
-          const code = el('input'); code.type = 'text'; code.inputMode = 'numeric'; code.autocomplete = 'one-time-code'; code.maxLength = 6; code.placeholder = '인증 앱의 6자리 코드';
-          section.append(field('6자리 인증 코드', code), button('등록 확인', async () => {
-            if (!/^[0-9]{6}$/.test(code.value)) { message('인증 앱에 표시된 6자리 코드를 입력해주세요.', true); code.focus(); return; }
-            disabled(true); message('2단계 인증 등록을 확인하고 있습니다.');
-            try { await verifyMfaCode(enrolled.data.id, code.value); if (token === epoch) await load('2단계 인증 등록을 완료했습니다.'); }
-            catch { if (token === epoch) { message('코드를 확인하지 못했습니다. 새 코드를 확인해 다시 입력해주세요.', true); disabled(false); code.focus(); } }
-          }));
-          disabled(false); message('QR 코드를 스캔하고 6자리 코드를 입력해주세요.'); code.focus();
-        } catch { if (token === epoch) { message('2단계 인증 등록을 시작하지 못했습니다. 다시 로그인한 뒤 시도해주세요.', true); disabled(false); } }
-      }));
-      root.appendChild(section);
-    }
-    function showPendingMfa(factor, token) {
-      const section = el('section');
-      section.append(el('h3', '관리자 2단계 인증 등록 이어서 하기'),
-        el('p', '앞에서 시작한 등록이 남아 있습니다. 이미 인증 앱에 추가했다면 6자리 코드를 입력하세요. QR을 저장하지 못했다면 이 미완료 등록만 정리한 뒤 다시 시작할 수 있습니다.', 'academy-notice'));
-      const code = el('input'); code.type = 'text'; code.inputMode = 'numeric'; code.autocomplete = 'one-time-code'; code.maxLength = 6; code.placeholder = '인증 앱의 6자리 코드';
-      section.append(field('6자리 인증 코드', code), button('등록 확인', async () => {
-        if (!/^[0-9]{6}$/.test(code.value)) { message('인증 앱에 표시된 6자리 코드를 입력해주세요.', true); code.focus(); return; }
-        disabled(true); message('미완료 등록을 확인하고 있습니다.');
-        try { await verifyMfaCode(factor.id, code.value); if (token === epoch) await load('2단계 인증 등록을 완료했습니다.'); }
-        catch { if (token === epoch) { message('코드를 확인하지 못했습니다. QR을 저장하지 못했다면 미완료 등록을 정리하고 다시 시작해주세요.', true); disabled(false); code.focus(); } }
-      }), button('미완료 등록 정리', async () => {
-        if (!global.confirm('유유스 학습실 관리자가 시작한 미완료 2단계 인증 등록만 삭제할까요?\n이미 등록 완료된 인증 수단은 건드리지 않습니다.')) return;
-        disabled(true); message('미완료 등록을 정리하고 있습니다.');
-        try {
-          const removed = await bounded(client.auth.mfa.unenroll({ factorId: factor.id }));
-          if (removed.error) throw removed.error;
-          if (token === epoch) await load('미완료 등록을 정리했습니다. 등록을 다시 시작해주세요.');
-        } catch { if (token === epoch) { message('미완료 등록을 정리하지 못했습니다. 다시 로그인한 뒤 시도해주세요.', true); disabled(false); } }
-      }));
-      root.appendChild(section);
-    }
-    async function requireMfa(token) {
-      const level = await bounded(client.auth.mfa.getAuthenticatorAssuranceLevel());
-      if (level.error) throw level.error;
-      if (token !== epoch) return false;
-      if (level.data.currentLevel === 'aal2') return true;
-      const factors = await bounded(client.auth.mfa.listFactors());
-      if (factors.error) throw factors.error;
-      if (token !== epoch) return false;
-      const factor = factors.data.totp.find(item => item.status === 'verified');
-      const pending = (Array.isArray(factors.data.all) ? factors.data.all : []).find(item => item.factor_type === 'totp'
-        && item.status === 'unverified' && item.friendly_name === '유유스 학습실 관리자');
-      if (factor) showMfaChallenge(factor, token);
-      else if (pending) showPendingMfa(pending, token);
-      else showMfaEnrollment(token);
-      message('학습실 관리 전용 2단계 인증이 필요합니다.');
-      return false;
     }
     function cohortField(cohorts) {
       const select = el('select');
@@ -305,7 +225,6 @@
       pageOffset = offset;
       busy = true; shell(); disabled(true); message('학습실 관리 정보를 확인하고 있습니다.');
       try {
-        if (!await requireMfa(token)) return;
         const { data, error } = await request('admin_snapshot', { offset: pageOffset });
         if (token !== epoch) return;
         if (error) throw error;

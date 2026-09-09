@@ -18,5 +18,3 @@
 .academy-admin summary { cursor: pointer; padding: 12px 0; }
 .academy-admin ul { padding-left: 20px; }
 .academy-admin li { margin: 10px 0; overflow-wrap: anywhere; }
-.academy-admin .academy-mfa-qr { display: block; width: min(240px, 100%); height: auto; margin: 16px 0; background: #fff; padding: 8px; border-radius: 8px; }
-.academy-admin .academy-mfa-secret { display: block; max-width: 100%; padding: 12px; margin-bottom: 12px; overflow-wrap: anywhere; user-select: all; background: var(--bg3, #222); border: 1px solid var(--border, #555); border-radius: 8px; }
