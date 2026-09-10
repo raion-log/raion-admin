@@ -11,7 +11,7 @@ class Element {
   replaceChildren(...nodes) { this.children=nodes; }
   setAttribute(k,v) { this.attrs[k]=v; }
   addEventListener(k,v) { this.events[k]=v; }
-  focus() { this.focused=true; }
+  focus() { if (!this.disabled) this.focused=true; }
   querySelectorAll(selector) {
     const tags=selector.split(',').map(x=>x.trim());
     return this.children.flatMap(c=>[...(tags.includes(c.tagName)?[c]:[]),...c.querySelectorAll(selector)]);
@@ -32,7 +32,7 @@ test('load errors are not rendered as empty queues and raw server detail is not 
   await admin.load();
   assert.match(textOf(root),/학습실 관리 권한/);
   assert.doesNotMatch(textOf(root),/승인 대기 신청이 없습니다|email@example/);
-  assert.equal(findButton(root,'다시 불러오기').disabled,false);
+  assert.equal(findButton(root,'새로고침').disabled,false);
 });
 test('missing database API is explicitly distinguished from a connected empty queue',async()=>{
   const {root,admin}=setup(async()=>({error:{code:'PGRST202'}}));
@@ -63,7 +63,7 @@ test('stalled requests time out with a result-unconfirmed message and a usable r
   const {root,admin}=setup(()=>new Promise(()=>{}),()=>true,{setTimeout:fn=>{timeout=fn;return 1;},clearTimeout:()=>{}});
   const pending=admin.load(); await new Promise(done=>setImmediate(done)); timeout(); await pending;
   assert.match(textOf(root),/처리 결과를 확인하지 못했습니다/);
-  assert.equal(findButton(root,'다시 불러오기').disabled,false);
+  assert.equal(findButton(root,'새로고침').disabled,false);
   assert.ok(root.children.some(node=>node.focused));
 });
 test('approval requires an explicit cohort, reason, confirmation and revision; double clicks are blocked',async()=>{
@@ -82,7 +82,8 @@ test('approval requires an explicit cohort, reason, confirmation and revision; d
   const select=root.querySelectorAll('select').find(node=>node.children.some(option=>String(option.textContent).includes('example@gmail.com')));
   select.value='12';select.selectedOptions=[{textContent:'2기 · 예시 학생 · example@gmail.com'}];
   await approve.events.click(); assert.equal(calls.length,1);
-  root.querySelectorAll('input').filter(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').at(-1).value='명단 확인';
+  const applicationRecord=root.querySelectorAll('article').find(node=>textOf(node).includes('example@gmail.com'));
+  applicationRecord.querySelectorAll('input').find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='명단 확인';
   const pending=approve.events.click();
   await approve.events.click();
   assert.equal(calls.length,2);
@@ -111,4 +112,54 @@ test('an authenticated academy administrator loads data without an app MFA flow'
   assert.match(textOf(root),/승인 대기 신청이 없습니다/);
   assert.doesNotMatch(textOf(root),/2단계 인증|인증 앱|QR 코드/);
   assert.doesNotMatch(source,/auth[.]mfa|aal2|academy_mfa_required/);
+});
+test('academy work is grouped into familiar subtabs with operations first',async()=>{
+  const {root,admin}=setup(async()=>({data:copy}));
+  await admin.load();
+  const operations=findButton(root,'가입·수강생');
+  const setupButton=findButton(root,'기수·명단');
+  const audit=findButton(root,'변경 기록');
+  assert.match(operations.className,/active/);
+  assert.equal(operations.attrs['aria-selected'],'true');
+  assert.equal(setupButton.attrs['aria-selected'],'false');
+  assert.equal(audit.attrs['aria-selected'],'false');
+  assert.match(textOf(root),/운영 중인 기수\s+0개\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
+  setupButton.events.click();
+  assert.match(setupButton.className,/active/);
+  assert.equal(setupButton.attrs['aria-selected'],'true');
+  assert.equal(operations.attrs['aria-selected'],'false');
+  setupButton.events.keydown({key:'ArrowRight',preventDefault(){}});
+  assert.match(audit.className,/active/);
+  assert.equal(audit.attrs['aria-selected'],'true');
+  assert.equal(audit.focused,true);
+});
+test('roster pagination does not empty the daily operations view',async()=>{
+  const calls=[];
+  const snapshot={...copy,totals:{applications:3,students:20,roster:250}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args);return {data:snapshot};});
+  await admin.load();
+  let operationsPanel=root.children.find(node=>node.id==='academy-view-operations');
+  let setupPanel=root.children.find(node=>node.id==='academy-view-setup');
+  assert.equal(findButton(operationsPanel,'다음 100건'),undefined);
+  assert.ok(findButton(setupPanel,'다음 100건'));
+  findButton(root,'기수·명단').events.click();
+  findButton(setupPanel,'다음 100건').events.click();
+  await new Promise(done=>setImmediate(done));
+  assert.equal(calls.at(-1).payload.offset,100);
+  findButton(root,'가입·수강생').events.click();
+  await new Promise(done=>setImmediate(done));
+  assert.equal(calls.at(-1).payload.offset,0);
+  operationsPanel=root.children.find(node=>node.id==='academy-view-operations');
+  assert.equal(findButton(operationsPanel,'다음 100건'),undefined);
+  assert.equal(findButton(root,'가입·수강생').focused,true);
+});
+test('a later page keeps its previous-page escape when totals shrink',async()=>{
+  const snapshot={...copy,totals:{applications:0,students:0,roster:100}};
+  const {root,admin}=setup(async()=>({data:snapshot}));
+  await admin.load();
+  findButton(root,'기수·명단').events.click();
+  await admin.load(undefined,100);
+  const setupPanel=root.children.find(node=>node.id==='academy-view-setup');
+  assert.ok(findButton(setupPanel,'이전 100건'));
+  assert.equal(findButton(setupPanel,'다음 100건'),undefined);
 });
