@@ -246,6 +246,7 @@ test('recent audit entries appear only on the related account',async()=>{
   ];
   const audit=[
     {subject_id:'student-a',action:'set_status',created_at:'2026-09-10T01:00:00Z',detail:{reason:'이용 재개'}},
+    {subject_id:'student-a',action:'application_auto_approved',created_at:'2026-09-10T00:30:00Z',detail:{}},
     {subject_id:'student-b',action:'assign',created_at:'2026-09-10T02:00:00Z',detail:{reason:'2기 배정'}}
   ];
   const {root,admin}=setup(async()=>({data:{...copy,students,audit}}));
@@ -253,7 +254,7 @@ test('recent audit entries appear only on the related account',async()=>{
   const first=root.querySelectorAll('article').find(node=>textOf(node).includes('studenta@gmail.com'));
   const second=root.querySelectorAll('article').find(node=>textOf(node).includes('studentb@gmail.com'));
   assert.match(textOf(first),/계정 관리/);
-  assert.match(textOf(first),/최근 이력\s+1건.*이용 상태 변경.*이용 재개/);
+  assert.match(textOf(first),/최근 이력\s+2건.*이용 상태 변경.*이용 재개.*명단 자동 확인/);
   assert.doesNotMatch(textOf(first),/2기 배정/);
   assert.match(textOf(second),/현재 기수 변경.*2기 배정/);
   assert.doesNotMatch(textOf(second),/이용 재개/);

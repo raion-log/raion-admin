@@ -123,6 +123,7 @@
     }
     function historyLabel(entry) {
       if (entry.action === 'application_submitted') return '가입 신청';
+      if (entry.action === 'application_auto_approved') return '명단 자동 확인';
       if (entry.action === 'review') return entry.detail?.after?.application_status === 'approved' ? '가입 승인' : '가입 반려';
       if (entry.action === 'assign') return '현재 기수 변경';
       if (entry.action === 'set_status') return '이용 상태 변경';
