@@ -14,8 +14,6 @@
 .academy-admin .academy-notice { color: var(--text2, #b0b0b0); font-size: 13px; }
 .academy-admin .academy-status { min-height: 22px; margin: 0 0 16px; color: var(--text2, #b0b0b0); font-size: 13px; }
 .academy-admin .academy-status:focus { outline: none; }
-.academy-admin .academy-subtabs { margin-bottom: 16px; }
-
 .academy-admin .academy-overview { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 16px; padding: 12px 16px; background: var(--bg2, #111); border: 1px solid var(--border, #2a2a2a); border-radius: 10px; }
 .academy-admin .academy-overview-item { display: inline-flex; align-items: baseline; gap: 7px; min-width: 0; }
 .academy-admin .academy-overview-label { color: var(--text2, #b0b0b0); font-size: 12px; }

@@ -5,10 +5,6 @@
     let epoch = 0;
     let busy = false;
     let pageOffset = 0;
-    let activeView = 'operations';
-    let focusViewAfterLoad = false;
-    let viewButtons = {};
-    let viewPanels = {};
     const el = (tag, text, className) => {
       const node = document.createElement(tag);
       if (text !== undefined) node.textContent = String(text ?? '');
@@ -59,66 +55,12 @@
       node.addEventListener('click', onClick);
       return node;
     }
-    function switchView(name, focus = false) {
-      if (!viewButtons[name] || !viewPanels[name]) return;
-      const changed = activeView !== name;
-      activeView = name;
-      if (changed && pageOffset > 0) {
-        focusViewAfterLoad = focus;
-        load(undefined, 0);
-        return;
-      }
-      for (const [key, node] of Object.entries(viewButtons)) {
-        const selected = key === name;
-        node.className = `subtab${selected ? ' active' : ''}`;
-        node.setAttribute('aria-selected', String(selected));
-        node.tabIndex = selected ? 0 : -1;
-      }
-      for (const [key, node] of Object.entries(viewPanels)) {
-        node.className = `academy-view${key === name ? '' : ' hidden'}`;
-      }
-      if (focus) viewButtons[name].focus();
-    }
-    function viewTab(name, text) {
-      const node = el('button', text, `subtab${activeView === name ? ' active' : ''}`);
-      node.type = 'button';
-      node.id = `academy-tab-${name}`;
-      node.setAttribute('role', 'tab');
-      node.setAttribute('aria-controls', `academy-view-${name}`);
-      node.setAttribute('aria-selected', String(activeView === name));
-      node.tabIndex = activeView === name ? 0 : -1;
-      node.addEventListener('click', () => switchView(name, true));
-      node.addEventListener('keydown', event => {
-        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault();
-        const order = ['operations', 'setup'];
-        const current = order.indexOf(name);
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? order.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + order.length) % order.length;
-        switchView(order[next], true);
-      });
-      viewButtons[name] = node;
-      return node;
-    }
-    function viewPanel(name) {
-      const node = el('div', undefined, `academy-view${activeView === name ? '' : ' hidden'}`);
-      node.id = `academy-view-${name}`;
-      node.setAttribute('role', 'tabpanel');
-      node.setAttribute('aria-labelledby', `academy-tab-${name}`);
-      viewPanels[name] = node;
-      return node;
-    }
     function shell() {
-      viewButtons = {};
-      viewPanels = {};
       const heading = el('div', undefined, 'academy-heading');
       heading.append(el('h2', '유유스 학습실 관리'), button('새로고침', () => load()));
-      const tabs = el('div', undefined, 'subtabs academy-subtabs');
-      tabs.setAttribute('role', 'tablist');
-      tabs.setAttribute('aria-label', '유유스 학습실 관리 메뉴');
-      tabs.append(viewTab('operations', '수강생'), viewTab('setup', '명단 관리'));
       root.replaceChildren(heading,
-        el('p', '가입 신청과 수강생을 확인합니다. 명단 관리는 필요할 때만 엽니다.', 'academy-notice'),
-        tabs, status);
+        el('p', '가입 신청, 수강생, 기수와 수강 명단을 한 화면에서 관리합니다.', 'academy-notice'),
+        status);
     }
     function disabled(value) {
       root.querySelectorAll('button, input, select').forEach(node => { node.disabled = value; });
@@ -367,12 +309,10 @@
       );
       return section;
     }
-    function pagination(data, view) {
+    function pagination(data) {
       const wrapper = el('div');
       const pages = el('nav', undefined, 'academy-pagination'); pages.setAttribute('aria-label', '관리 목록 페이지');
-      const total = view === 'operations'
-        ? Math.max(data.totals?.applications || 0, data.totals?.students || 0)
-        : data.totals?.roster || 0;
+      const total = Math.max(data.totals?.applications || 0, data.totals?.students || 0, data.totals?.roster || 0);
       if (pageOffset > 0) pages.appendChild(button('이전 100건', () => load(undefined, Math.max(0, pageOffset - 100))));
       if (total > pageOffset + 100) {
         pages.appendChild(button('다음 100건', () => load(undefined, pageOffset + 100)));
@@ -383,7 +323,6 @@
     async function load(successMessage, offset = pageOffset) {
       if (busy) return;
       const token = ++epoch;
-      let restoreViewFocus = false;
       let loaded = false;
       pageOffset = offset;
       busy = true; shell(); disabled(true); message('학습실 관리 정보를 확인하고 있습니다.');
@@ -392,29 +331,24 @@
         if (token !== epoch) return;
         if (error) throw error;
         if (data?.version !== 2 || !['applications', 'students', 'cohorts', 'roster', 'audit'].every(key => Array.isArray(data[key]))) throw new Error('invalid_contract');
-        const operations = viewPanel('operations');
-        operations.append(summary(data), applications(data.applications, data.totals?.applications, data.audit), students(data.students, data.totals?.students, data.audit), pagination(data, 'operations'));
-        const setup = viewPanel('setup');
+        const content = el('div', undefined, 'academy-view');
         const management = el('section', undefined, 'academy-card');
-        management.append(el('h3', '기수·수강 명단'), cohortManagement(data.cohorts), rosterManagement(data.roster, data.cohorts));
-        setup.append(management, pagination(data, 'setup'));
-        root.append(operations, setup);
-        restoreViewFocus = focusViewAfterLoad;
-        focusViewAfterLoad = false;
-        switchView(activeView);
+        management.append(el('h3', '기수·수강 명단'), cohortManagement(data.cohorts), rosterManagement(data.roster.slice(0, 100), data.cohorts));
+        content.append(summary(data), applications(data.applications, data.totals?.applications, data.audit), students(data.students, data.totals?.students, data.audit), management, pagination(data));
+        root.append(content);
         message(successMessage || '학습실 전용 권한과 최신 정보를 확인했습니다.');
         loaded = true;
       } catch (error) {
-        if (token === epoch) { focusViewAfterLoad = false; message(errorMessage(error), true); status.focus(); }
+        if (token === epoch) { message(errorMessage(error), true); status.focus(); }
       } finally {
         if (token === epoch) {
           busy = false;
           disabled(false);
-          if (loaded) (restoreViewFocus ? viewButtons[activeView] : status).focus();
+          if (loaded) status.focus();
         }
       }
     }
-    function clear() { epoch++; busy = false; pageOffset = 0; focusViewAfterLoad = false; root.replaceChildren(); }
+    function clear() { epoch++; busy = false; pageOffset = 0; root.replaceChildren(); }
     return { load, clear };
   }
   global.createAcademyAdmin = createAcademyAdmin;

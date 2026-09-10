@@ -113,25 +113,15 @@ test('an authenticated academy administrator loads data without an app MFA flow'
   assert.doesNotMatch(textOf(root),/2단계 인증|인증 앱|QR 코드/);
   assert.doesNotMatch(source,/auth[.]mfa|aal2|academy_mfa_required/);
 });
-test('academy work keeps only student and roster-management subtabs with a compact overview',async()=>{
+test('academy work uses one screen without inner tabs and keeps a compact overview',async()=>{
   const {root,admin}=setup(async()=>({data:copy}));
   await admin.load();
-  const operations=findButton(root,'수강생');
-  const setupButton=findButton(root,'명단 관리');
-  const audit=findButton(root,'변경 기록');
-  assert.match(operations.className,/active/);
-  assert.equal(operations.attrs['aria-selected'],'true');
-  assert.equal(setupButton.attrs['aria-selected'],'false');
-  assert.equal(audit,undefined);
+  assert.equal(findButton(root,'수강생'),undefined);
+  assert.equal(findButton(root,'명단 관리'),undefined);
+  assert.equal(findButton(root,'변경 기록'),undefined);
+  assert.equal(root.querySelectorAll('button').filter(node=>node.attrs.role==='tab').length,0);
   assert.match(textOf(root),/현재 입장 가능한 기수\s+0개\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
-  setupButton.events.click();
-  assert.match(setupButton.className,/active/);
-  assert.equal(setupButton.attrs['aria-selected'],'true');
-  assert.equal(operations.attrs['aria-selected'],'false');
-  setupButton.events.keydown({key:'ArrowRight',preventDefault(){}});
-  assert.match(operations.className,/active/);
-  assert.equal(operations.attrs['aria-selected'],'true');
-  assert.equal(operations.focused,true);
+  assert.match(textOf(root),/가입 승인 대기 \(0\).*수강생 관리 \(0\).*기수·수강 명단/);
 });
 test('cohorts and roster share one card while cohort access is expressed as open or closed',async()=>{
   const snapshot={...copy,cohorts:[
@@ -142,23 +132,20 @@ test('cohorts and roster share one card while cohort access is expressed as open
   ]};
   const {root,admin}=setup(async()=>({data:snapshot}));
   await admin.load();
-  findButton(root,'명단 관리').events.click();
-  const setupPanel=root.children.find(node=>node.id==='academy-view-setup');
-  assert.equal(setupPanel.children.filter(node=>String(node.className).includes('academy-card')).length,1);
-  assert.match(textOf(setupPanel),/기수·수강 명단.*기수.*수강 명단/);
-  assert.match(textOf(setupPanel),/수강생 입장 열림.*수강생 입장 닫힘.*수강생 입장 예정.*수강생 입장 기간 종료/);
-  assert.doesNotMatch(textOf(setupPanel),/1기 · 유유스 1기/);
-  assert.ok(findButton(setupPanel,'입장 닫기'));
-  assert.ok(findButton(setupPanel,'입장 열기'));
-  assert.doesNotMatch(textOf(setupPanel),/운영 상태|명단 접수|보관/);
+  const management=root.querySelectorAll('section').find(node=>textOf(node).includes('기수·수강 명단'));
+  assert.ok(management);
+  assert.match(textOf(management),/기수·수강 명단.*기수.*수강 명단/);
+  assert.match(textOf(management),/수강생 입장 열림.*수강생 입장 닫힘.*수강생 입장 예정.*수강생 입장 기간 종료/);
+  assert.doesNotMatch(textOf(management),/1기 · 유유스 1기/);
+  assert.ok(findButton(management,'입장 닫기'));
+  assert.ok(findButton(management,'입장 열기'));
+  assert.doesNotMatch(textOf(management),/운영 상태|명단 접수|보관/);
 });
 test('cohort creation rejects an invalid address code and reversed dates before an RPC write',async()=>{
   const calls=[];
   const {root,admin}=setup(async(_name,args)=>{calls.push(args);return {data:copy};});
   await admin.load();
-  findButton(root,'명단 관리').events.click();
-  const setupPanel=root.children.find(node=>node.id==='academy-view-setup');
-  const create=setupPanel.querySelectorAll('details').find(node=>textOf(node).includes('새 기수 추가'));
+  const create=root.querySelectorAll('details').find(node=>textOf(node).includes('새 기수 추가'));
   const inputs=create.querySelectorAll('input');
   inputs.find(node=>node.placeholder==='예: 2').value='3';
   inputs.find(node=>node.placeholder==='예: 유유스 2기').value='유유스 3기';
@@ -183,9 +170,7 @@ test('new cohorts start closed and cohort access buttons keep revision and reaso
     return {data:{ok:true}};
   });
   await admin.load();
-  findButton(root,'명단 관리').events.click();
-  const setupPanel=root.children.find(node=>node.id==='academy-view-setup');
-  const create=setupPanel.querySelectorAll('details').find(node=>textOf(node).includes('새 기수 추가'));
+  const create=root.querySelectorAll('details').find(node=>textOf(node).includes('새 기수 추가'));
   create.querySelectorAll('input').find(node=>node.placeholder==='예: 2').value='3';
   create.querySelectorAll('input').find(node=>node.placeholder==='예: 유유스 2기').value='유유스 3기';
   create.querySelectorAll('input').find(node=>node.placeholder==='예: 2gi').value='3gi';
@@ -194,9 +179,7 @@ test('new cohorts start closed and cohort access buttons keep revision and reaso
   assert.equal(calls[1].action,'cohort_create');
   assert.equal(calls[1].payload.status,'draft');
 
-  findButton(root,'명단 관리').events.click();
-  const refreshedSetup=root.children.find(node=>node.id==='academy-view-setup');
-  const cohortRecord=refreshedSetup.querySelectorAll('article').find(node=>textOf(node).includes('유유스 2기'));
+  const cohortRecord=root.querySelectorAll('article').find(node=>textOf(node).includes('유유스 2기'));
   cohortRecord.querySelectorAll('input').find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='개강 확인';
   await findButton(cohortRecord,'입장 열기').events.click();
   assert.equal(calls[3].action,'cohort_set_status');
@@ -223,33 +206,31 @@ test('recent audit entries appear only on the related account',async()=>{
   assert.match(textOf(second),/현재 기수 변경.*2기 배정/);
   assert.doesNotMatch(textOf(second),/이용 재개/);
 });
-test('roster pagination does not empty the daily operations view',async()=>{
+test('one shared pagination advances all visible academy lists by 100',async()=>{
   const calls=[];
   const snapshot={...copy,totals:{applications:3,students:20,roster:250}};
   const {root,admin}=setup(async(_name,args)=>{calls.push(args);return {data:snapshot};});
   await admin.load();
-  let operationsPanel=root.children.find(node=>node.id==='academy-view-operations');
-  let setupPanel=root.children.find(node=>node.id==='academy-view-setup');
-  assert.equal(findButton(operationsPanel,'다음 100건'),undefined);
-  assert.ok(findButton(setupPanel,'다음 100건'));
-  findButton(root,'명단 관리').events.click();
-  findButton(setupPanel,'다음 100건').events.click();
+  assert.ok(findButton(root,'다음 100건'));
+  findButton(root,'다음 100건').events.click();
   await new Promise(done=>setImmediate(done));
   assert.equal(calls.at(-1).payload.offset,100);
-  findButton(root,'수강생').events.click();
-  await new Promise(done=>setImmediate(done));
-  assert.equal(calls.at(-1).payload.offset,0);
-  operationsPanel=root.children.find(node=>node.id==='academy-view-operations');
-  assert.equal(findButton(operationsPanel,'다음 100건'),undefined);
-  assert.equal(findButton(root,'수강생').focused,true);
+  assert.ok(findButton(root,'이전 100건'));
+});
+test('the client displays at most 100 roster rows to match its pagination step',async()=>{
+  const roster=Array.from({length:150},(_,index)=>({id:index+1,revision:1,user_id:null,display_name:`학생 ${index+1}`,canonical_gmail:`student${index+1}@gmail.com`,phone_last_four:'0000',cohort_name:'유유스 1기',status:'eligible',source_reference:''}));
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
+  const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort],roster,totals:{applications:0,students:0,roster:150}}}));
+  await admin.load();
+  const management=root.querySelectorAll('section').find(node=>textOf(node).includes('기수·수강 명단'));
+  const rosterRecords=management.querySelectorAll('article').filter(node=>textOf(node).includes('@gmail.com'));
+  assert.equal(rosterRecords.length,100);
 });
 test('a later page keeps its previous-page escape when totals shrink',async()=>{
   const snapshot={...copy,totals:{applications:0,students:0,roster:100}};
   const {root,admin}=setup(async()=>({data:snapshot}));
   await admin.load();
-  findButton(root,'명단 관리').events.click();
   await admin.load(undefined,100);
-  const setupPanel=root.children.find(node=>node.id==='academy-view-setup');
-  assert.ok(findButton(setupPanel,'이전 100건'));
-  assert.equal(findButton(setupPanel,'다음 100건'),undefined);
+  assert.ok(findButton(root,'이전 100건'));
+  assert.equal(findButton(root,'다음 100건'),undefined);
 });
