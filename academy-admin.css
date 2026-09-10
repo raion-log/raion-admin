@@ -6,6 +6,7 @@
 .academy-admin h2 { font-size: 24px; margin: 0; }
 .academy-admin h3 { font-size: 16px; margin: 0 0 16px; color: var(--accent, #ffd700); }
 .academy-admin h4 { font-size: 14px; margin: 0 0 6px; }
+.academy-admin h5 { font-size: 14px; margin: 0 0 6px; }
 .academy-admin p { line-height: 1.6; margin: 0 0 12px; overflow-wrap: anywhere; }
 
 .academy-admin .academy-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
@@ -22,6 +23,8 @@
 
 .academy-admin .academy-card { background: var(--bg2, #111); border: 1px solid var(--border, #2a2a2a); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
 .academy-admin .academy-card > .academy-record:first-of-type { border-top: 0; }
+.academy-admin .academy-management-group + .academy-management-group { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
+.academy-admin .academy-management-group > h4 { font-size: 15px; margin-bottom: 6px; }
 .academy-admin .academy-record { padding: 16px 0; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-record:last-child { padding-bottom: 0; }
 .academy-admin .academy-record p { color: var(--text2, #b0b0b0); font-size: 13px; }
@@ -63,5 +66,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .academy-admin * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .academy-admin *, .academy-admin *::before, .academy-admin *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
