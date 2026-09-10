@@ -113,25 +113,44 @@ test('an authenticated academy administrator loads data without an app MFA flow'
   assert.doesNotMatch(textOf(root),/2단계 인증|인증 앱|QR 코드/);
   assert.doesNotMatch(source,/auth[.]mfa|aal2|academy_mfa_required/);
 });
-test('academy work is grouped into familiar subtabs with operations first',async()=>{
+test('academy work keeps only student and setup subtabs with a compact overview',async()=>{
   const {root,admin}=setup(async()=>({data:copy}));
   await admin.load();
-  const operations=findButton(root,'가입·수강생');
+  const operations=findButton(root,'수강생');
   const setupButton=findButton(root,'기수·명단');
   const audit=findButton(root,'변경 기록');
   assert.match(operations.className,/active/);
   assert.equal(operations.attrs['aria-selected'],'true');
   assert.equal(setupButton.attrs['aria-selected'],'false');
-  assert.equal(audit.attrs['aria-selected'],'false');
+  assert.equal(audit,undefined);
   assert.match(textOf(root),/운영 중인 기수\s+0개\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
   setupButton.events.click();
   assert.match(setupButton.className,/active/);
   assert.equal(setupButton.attrs['aria-selected'],'true');
   assert.equal(operations.attrs['aria-selected'],'false');
   setupButton.events.keydown({key:'ArrowRight',preventDefault(){}});
-  assert.match(audit.className,/active/);
-  assert.equal(audit.attrs['aria-selected'],'true');
-  assert.equal(audit.focused,true);
+  assert.match(operations.className,/active/);
+  assert.equal(operations.attrs['aria-selected'],'true');
+  assert.equal(operations.focused,true);
+});
+test('recent audit entries appear only on the related account',async()=>{
+  const students=[
+    {user_id:'student-a',revision:1,display_name:'학생 가',canonical_gmail:'studenta@gmail.com',phone_last_four:'0001',status:'active'},
+    {user_id:'student-b',revision:1,display_name:'학생 나',canonical_gmail:'studentb@gmail.com',phone_last_four:'0002',status:'active'}
+  ];
+  const audit=[
+    {subject_id:'student-a',action:'set_status',created_at:'2026-09-10T01:00:00Z',detail:{reason:'이용 재개'}},
+    {subject_id:'student-b',action:'assign',created_at:'2026-09-10T02:00:00Z',detail:{reason:'2기 배정'}}
+  ];
+  const {root,admin}=setup(async()=>({data:{...copy,students,audit}}));
+  await admin.load();
+  const first=root.querySelectorAll('article').find(node=>textOf(node).includes('studenta@gmail.com'));
+  const second=root.querySelectorAll('article').find(node=>textOf(node).includes('studentb@gmail.com'));
+  assert.match(textOf(first),/계정 관리/);
+  assert.match(textOf(first),/최근 이력\s+1건.*이용 상태 변경.*이용 재개/);
+  assert.doesNotMatch(textOf(first),/2기 배정/);
+  assert.match(textOf(second),/현재 기수 변경.*2기 배정/);
+  assert.doesNotMatch(textOf(second),/이용 재개/);
 });
 test('roster pagination does not empty the daily operations view',async()=>{
   const calls=[];
@@ -146,12 +165,12 @@ test('roster pagination does not empty the daily operations view',async()=>{
   findButton(setupPanel,'다음 100건').events.click();
   await new Promise(done=>setImmediate(done));
   assert.equal(calls.at(-1).payload.offset,100);
-  findButton(root,'가입·수강생').events.click();
+  findButton(root,'수강생').events.click();
   await new Promise(done=>setImmediate(done));
   assert.equal(calls.at(-1).payload.offset,0);
   operationsPanel=root.children.find(node=>node.id==='academy-view-operations');
   assert.equal(findButton(operationsPanel,'다음 100건'),undefined);
-  assert.equal(findButton(root,'가입·수강생').focused,true);
+  assert.equal(findButton(root,'수강생').focused,true);
 });
 test('a later page keeps its previous-page escape when totals shrink',async()=>{
   const snapshot={...copy,totals:{applications:0,students:0,roster:100}};

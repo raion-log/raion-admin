@@ -91,7 +91,7 @@
       node.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
-        const order = ['operations', 'setup', 'audit'];
+        const order = ['operations', 'setup'];
         const current = order.indexOf(name);
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? order.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + order.length) % order.length;
         switchView(order[next], true);
@@ -115,9 +115,9 @@
       const tabs = el('div', undefined, 'subtabs academy-subtabs');
       tabs.setAttribute('role', 'tablist');
       tabs.setAttribute('aria-label', '유유스 학습실 관리 메뉴');
-      tabs.append(viewTab('operations', '가입·수강생'), viewTab('setup', '기수·명단'), viewTab('audit', '변경 기록'));
+      tabs.append(viewTab('operations', '수강생'), viewTab('setup', '기수·명단'));
       root.replaceChildren(heading,
-        el('p', '가입 신청과 수강생 상태를 확인합니다. 기수와 수강 명단 설정은 별도 메뉴에서 관리합니다.', 'academy-notice'),
+        el('p', '가입 신청과 수강생을 먼저 확인하고, 기수와 명단은 필요할 때만 관리합니다.', 'academy-notice'),
         tabs, status);
     }
     function disabled(value) {
@@ -169,6 +169,40 @@
       section.append(el('h4', row.display_name), el('p', `${row.canonical_gmail} · 휴대폰 끝 ${row.phone_last_four}`));
       return section;
     }
+    function disclosure(label, children, meta) {
+      const details = el('details', undefined, 'academy-disclosure');
+      const summary = el('summary');
+      summary.append(el('span', label, 'academy-disclosure-title'));
+      if (meta) summary.append(el('span', meta, 'academy-disclosure-meta'));
+      const body = el('div', undefined, 'academy-disclosure-body');
+      body.append(...children);
+      details.append(summary, body);
+      return details;
+    }
+    function historyLabel(entry) {
+      if (entry.action === 'application_submitted') return '가입 신청';
+      if (entry.action === 'review') return entry.detail?.after?.application_status === 'approved' ? '가입 승인' : '가입 반려';
+      if (entry.action === 'assign') return '현재 기수 변경';
+      if (entry.action === 'set_status') return '이용 상태 변경';
+      return '계정 정보 변경';
+    }
+    function historyDisclosure(userId, audit) {
+      const rows = audit.filter(entry => String(entry.subject_id || '') === String(userId)).slice(0, 10);
+      const content = [];
+      if (!rows.length) content.push(el('p', '표시할 최근 이력이 없습니다.', 'empty'));
+      else {
+        const list = el('ul', undefined, 'academy-history-list');
+        for (const entry of rows) {
+          const when = entry.created_at ? new Intl.DateTimeFormat('ko-KR', {
+            dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul'
+          }).format(new Date(entry.created_at)) : '시각 확인 필요';
+          const reason = entry.detail?.reason ? ` · ${entry.detail.reason}` : '';
+          list.appendChild(el('li', `${when} · ${historyLabel(entry)}${reason}`));
+        }
+        content.push(list, el('p', '이 화면이 불러온 최근 운영 기록 중 최대 10건을 표시합니다.', 'academy-notice'));
+      }
+      return disclosure('최근 이력', content, `${rows.length}건`);
+    }
     function rosterField(rows) {
       const select = el('select');
       const empty = el('option', rows.length ? '일치하는 명단을 선택하세요' : '일치하는 수강 명단이 없습니다'); empty.value = '';
@@ -179,24 +213,28 @@
       }
       return select;
     }
-    function applications(rows, total = rows.length) {
+    function applications(rows, total = rows.length, audit = []) {
       const section = el('section', undefined, 'academy-card'); section.appendChild(el('h3', `가입 승인 대기 (${total})`));
       if (!rows.length) section.appendChild(el('p', '승인 대기 신청이 없습니다.', 'empty'));
       for (const row of rows) {
         const card = record(row), matches = Array.isArray(row.roster_matches) ? row.roster_matches : [], rosterSelect = rosterField(matches), reason = reasonField();
         const fields = el('div', undefined, 'academy-fields');
         fields.append(field('이름·Gmail·끝 4자리가 모두 같은 수강 명단', rosterSelect), field('검토 사유', reason));
-        if (!matches.length) card.appendChild(el('p', '먼저 아래 수강 명단에 이 학생을 정확히 등록해주세요.', 'academy-notice'));
-        card.append(fields, button('승인하고 기수 배정', () => {
+        const review = [];
+        if (!matches.length) review.push(el('p', '먼저 기수·명단에서 이 학생을 정확히 등록해주세요.', 'academy-notice'));
+        const actions = el('div', undefined, 'academy-actions');
+        actions.append(button('승인하고 기수 배정', () => {
           if (!rosterSelect.value) { message('이름·Gmail·끝 4자리가 모두 같은 수강 명단을 선택해주세요.', true); rosterSelect.focus(); return; }
           const name = rosterSelect.selectedOptions[0].textContent;
           return command('review', row, { decision: 'approve', roster_entry_id: Number(rosterSelect.value) }, reason, `${name} 명단과 신청을 묶어 승인할까요?`);
         }, 'primary'), button('신청 반려', () => command('review', row, { decision: 'reject' }, reason, `${row.display_name} 학생의 신청을 반려할까요?`), 'danger'));
+        review.push(fields, actions);
+        card.append(disclosure('가입 신청 검토', review), historyDisclosure(row.user_id, audit));
         section.appendChild(card);
       }
       return section;
     }
-    function students(rows, total = rows.length) {
+    function students(rows, total = rows.length, audit = []) {
       const section = el('section', undefined, 'academy-card'); section.appendChild(el('h3', `수강생 관리 (${total})`));
       if (!rows.length) section.appendChild(el('p', '등록된 학습실 수강생이 없습니다.', 'empty'));
       const statuses = { active: '이용 가능', suspended: '이용 정지', revoked: '이용 해지' };
@@ -204,16 +242,18 @@
         const candidates = Array.isArray(row.roster_options) ? row.roster_options : [];
         const card = record(row), rosterSelect = rosterField(candidates), reason = reasonField();
         const fields = el('div', undefined, 'academy-fields');
-        card.appendChild(el('p', `${statuses[row.status] || '운영 확인 필요'} · 현재 배정: ${row.cohort_name || '없음'}`));
+        card.appendChild(el('p', `${statuses[row.status] || '운영 확인 필요'} · 현재 기수 ${row.cohort_name || '없음'}`));
         fields.append(field('현재 기수로 사용할 등록 명단', rosterSelect), field('변경 사유', reason));
-        card.append(fields, button('현재 기수 변경', () => {
+        const actions = el('div', undefined, 'academy-actions');
+        actions.append(button('현재 기수 변경', () => {
           if (!rosterSelect.value) { message('이 학생과 일치하는 기수 명단을 선택해주세요.', true); rosterSelect.focus(); return; }
           return command('assign', row, { roster_entry_id: Number(rosterSelect.value) }, reason, `${row.display_name} 학생의 현재 기수를 ${rosterSelect.selectedOptions[0].textContent}(으)로 바꿀까요?`);
         }, 'primary'));
         for (const [value, label] of Object.entries(statuses)) {
           if (row.status === value) continue;
-          card.appendChild(button(label + '로 변경', () => command('set_status', row, { status: value }, reason, `${row.display_name} 학생을 ${label} 상태로 바꿀까요?`), value === 'active' ? 'primary' : value === 'revoked' ? 'danger' : 'outline'));
+          actions.appendChild(button(label + '로 변경', () => command('set_status', row, { status: value }, reason, `${row.display_name} 학생을 ${label} 상태로 바꿀까요?`), value === 'active' ? 'primary' : value === 'revoked' ? 'danger' : 'outline'));
         }
+        card.append(disclosure('계정 관리', [fields, actions]), historyDisclosure(row.user_id, audit));
         section.appendChild(card);
       }
       return section;
@@ -233,10 +273,11 @@
       }
       const fields=el('div',undefined,'academy-fields');
       fields.append(field('기수 번호',number),field('표시 이름',name),field('주소 코드',slug),field('운영 상태',statusSelect),field('시작일',starts),field('종료일',ends),field('등록 사유',reason));
-      section.append(fields,button('새 기수 등록',()=>{
+      const createAction = button('새 기수 등록',()=>{
         if(!number.value || !name.value.trim() || !slug.value.trim()) { message('기수 번호·표시 이름·주소 코드를 모두 입력해주세요.',true); number.focus(); return; }
         return mutate('cohort_create',{cohort_number:Number(number.value),name:name.value.trim(),slug:slug.value.trim(),status:statusSelect.value,starts_on:starts.value,ends_on:ends.value},reason,`${name.value.trim()} 기수를 등록할까요?`);
-      },'primary'));
+      },'primary');
+      section.appendChild(disclosure('새 기수 등록', [fields, createAction]));
       const statuses={draft:'준비',enrollment:'명단 접수',active:'운영 중',completed:'종료',archived:'보관'};
       for(const row of rows) {
         const card=el('article',undefined,'academy-record');
@@ -244,7 +285,7 @@
         const next=el('select');
         for(const [value,label] of Object.entries(statuses)) { const option=el('option',label); option.value=value; if(value===row.status) option.selected=true; next.appendChild(option); }
         const changeReason=reasonField(); const edit=el('div',undefined,'academy-fields'); edit.append(field('변경할 운영 상태',next),field('변경 사유',changeReason));
-        card.append(edit,button('기수 상태 변경',()=>mutate('cohort_set_status',{cohort_id:row.id,revision:row.revision,status:next.value},changeReason,`${row.name} 상태를 ${next.selectedOptions[0].textContent}(으)로 바꿀까요?`)));
+        card.appendChild(disclosure('운영 상태 변경', [edit, button('기수 상태 변경',()=>mutate('cohort_set_status',{cohort_id:row.id,revision:row.revision,status:next.value},changeReason,`${row.name} 상태를 ${next.selectedOptions[0].textContent}(으)로 바꿀까요?`))]));
         section.appendChild(card);
       }
       return section;
@@ -259,10 +300,11 @@
       const reference=input('text','선택: 주문/신청 번호'); reference.maxLength=80;
       const reason=reasonField(); const fields=el('div',undefined,'academy-fields');
       fields.append(field('기수',cohort),field('이름',name),field('Gmail 아이디 (@gmail.com 고정)',gmail),field('휴대폰 끝 4자리',phone),field('외부 참조 번호 (선택)',reference),field('등록 사유',reason));
-      section.append(fields,button('수강 명단에 추가',()=>{
+      const addAction = button('수강 명단에 추가',()=>{
         if(!cohort.value || !name.value.trim() || !gmail.value.trim() || !/^[0-9]{4}$/.test(phone.value)) { message('기수·이름·Gmail 아이디·휴대폰 끝 4자리를 확인해주세요.',true); cohort.focus(); return; }
         return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmail.value.trim(),phone_last_four:phone.value,source_reference:reference.value.trim()},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
-      },'primary'));
+      },'primary');
+      section.appendChild(disclosure('수강 명단 추가', [fields, addAction]));
       const labels={eligible:'승인 대기 가능',bound:'계정 연결 완료',cancelled:'명단 취소'};
       for(const row of rows) {
         const card=record(row); card.appendChild(el('p',`${row.cohort_name} · ${labels[row.status] || row.status}${row.source_reference ? ` · 참조 ${row.source_reference}` : ''}`));
@@ -273,19 +315,22 @@
           const editReference=input('text'); editReference.value=row.source_reference || ''; editReference.maxLength=80;
           const editReason=reasonField(); const editFields=el('div',undefined,'academy-fields');
           editFields.append(field('이름',editName),field('Gmail 아이디 (@gmail.com 고정)',editGmail),field('휴대폰 끝 4자리',editPhone),field('외부 참조 번호 (선택)',editReference),field('수정 사유',editReason));
-          card.append(editFields,button(row.status==='cancelled' ? '수정하고 명단 복구' : '명단 정보 수정',()=>mutate('roster_update',{roster_entry_id:row.id,revision:row.revision,display_name:editName.value.trim(),gmail_local_id:editGmail.value.trim(),phone_last_four:editPhone.value,source_reference:editReference.value.trim()},editReason,`${row.display_name} 학생의 ${row.cohort_name} 명단 정보를 저장할까요?`)));
+          card.appendChild(disclosure('명단 정보 관리', [editFields, button(row.status==='cancelled' ? '수정하고 명단 복구' : '명단 정보 수정',()=>mutate('roster_update',{roster_entry_id:row.id,revision:row.revision,display_name:editName.value.trim(),gmail_local_id:editGmail.value.trim(),phone_last_four:editPhone.value,source_reference:editReference.value.trim()},editReason,`${row.display_name} 학생의 ${row.cohort_name} 명단 정보를 저장할까요?`))]));
         }
-        if(row.status==='eligible') { const cancelReason=reasonField(); card.append(field('취소 사유',cancelReason),button('명단 취소',()=>mutate('roster_cancel',{roster_entry_id:row.id,revision:row.revision},cancelReason,`${row.display_name} 학생의 ${row.cohort_name} 명단을 취소할까요?`),'danger')); }
+        if(row.status==='eligible') {
+          const cancelReason=reasonField();
+          card.appendChild(disclosure('명단 취소', [field('취소 사유',cancelReason),button('명단 취소',()=>mutate('roster_cancel',{roster_entry_id:row.id,revision:row.revision},cancelReason,`${row.display_name} 학생의 ${row.cohort_name} 명단을 취소할까요?`),'danger')]));
+        }
         section.appendChild(card);
       }
       return section;
     }
     function summary(data) {
-      const section = el('section', undefined, 'academy-summary');
+      const section = el('section', undefined, 'academy-overview');
       section.setAttribute('aria-label', '학습실 운영 요약');
       const metric = (label, value) => {
-        const item = el('div', undefined, 'academy-summary-item');
-        item.append(el('span', label, 'academy-summary-label'), el('strong', value, 'academy-summary-value'));
+        const item = el('span', undefined, 'academy-overview-item');
+        item.append(el('span', label, 'academy-overview-label'), el('strong', value, 'academy-overview-value'));
         return item;
       };
       const activeCohorts = data.cohorts.filter(row => row.status === 'active').length;
@@ -309,18 +354,6 @@
       if (pageOffset > 0 || total > 100) wrapper.append(pages, el('p', `목록 ${pageOffset + 1}번부터 최대 100건을 표시합니다.`, 'academy-notice'));
       return wrapper;
     }
-    function auditManagement(rows) {
-      const section = el('section', undefined, 'academy-card');
-      section.appendChild(el('h3', `최근 변경 기록 (${rows.length})`));
-      if (!rows.length) {
-        section.appendChild(el('p', '변경 기록이 없습니다.', 'empty'));
-        return section;
-      }
-      const list = el('ul', undefined, 'academy-audit-list');
-      for (const entry of rows) list.appendChild(el('li', `${entry.created_at} · ${entry.action} · 대상 ${entry.subject_id} · ${entry.detail?.reason || '신청 접수'}`));
-      section.appendChild(list);
-      return section;
-    }
     async function load(successMessage, offset = pageOffset) {
       if (busy) return;
       const token = ++epoch;
@@ -334,12 +367,10 @@
         if (error) throw error;
         if (data?.version !== 2 || !['applications', 'students', 'cohorts', 'roster', 'audit'].every(key => Array.isArray(data[key]))) throw new Error('invalid_contract');
         const operations = viewPanel('operations');
-        operations.append(summary(data), applications(data.applications, data.totals?.applications), students(data.students, data.totals?.students), pagination(data, 'operations'));
+        operations.append(summary(data), applications(data.applications, data.totals?.applications, data.audit), students(data.students, data.totals?.students, data.audit), pagination(data, 'operations'));
         const setup = viewPanel('setup');
         setup.append(cohortManagement(data.cohorts), rosterManagement(data.roster, data.cohorts), pagination(data, 'setup'));
-        const audit = viewPanel('audit');
-        audit.append(auditManagement(data.audit), el('p', '최근 변경 기록은 최대 50건까지 표시합니다.', 'academy-notice'));
-        root.append(operations, setup, audit);
+        root.append(operations, setup);
         restoreViewFocus = focusViewAfterLoad;
         focusViewAfterLoad = false;
         switchView(activeView);
