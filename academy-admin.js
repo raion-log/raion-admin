@@ -358,9 +358,14 @@
       }
       const result=el('p','현재 페이지 목록을 검색하거나 정렬할 수 있습니다.','academy-list-result');
       result.setAttribute('role','status'); result.setAttribute('aria-live','polite');
-      const clear=button('검색 지우기',()=>{ search.value=''; onChange('',sort.value,result); search.focus(); });
-      search.addEventListener('input',()=>onChange(search.value,sort.value,result));
-      sort.addEventListener('change',()=>onChange(search.value,sort.value,result));
+      let searchTimer;
+      const cancelSearch=()=>{ if(searchTimer) { clearTimeout(searchTimer); searchTimer=undefined; } };
+      const clear=button('검색 지우기',()=>{ cancelSearch(); search.value=''; onChange('',sort.value,result); search.focus(); });
+      search.addEventListener('input',()=>{
+        cancelSearch();
+        searchTimer=setTimeout(()=>{ searchTimer=undefined; onChange(search.value,sort.value,result); },100);
+      });
+      sort.addEventListener('change',()=>{ cancelSearch(); onChange(search.value,sort.value,result); });
       const fields=el('div',undefined,'academy-list-control-fields');
       fields.append(field('현재 페이지 목록 찾기',search),field('정렬',sort),clear);
       section.append(fields,result);
@@ -394,6 +399,7 @@
         const management = el('section', undefined, 'academy-card');
         management.append(el('h3', '기수·수강 명단'), cohortManagement(data.cohorts), rosterHost);
         const renderLists=(queryValue,sortMode,result)=>{
+          if(token !== epoch) return;
           const query=String(queryValue || '').trim().toLowerCase();
           const filter=rows=>sortAcademyRows(rows.filter(row=>!query || academySearchText(row).includes(query)),sortMode || 'default');
           const visibleApplications=filter(data.applications);

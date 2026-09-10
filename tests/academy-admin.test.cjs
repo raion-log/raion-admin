@@ -160,6 +160,7 @@ test('academy lists can be searched and sorted without adding unsafe bulk accoun
   const sort=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='현재 페이지 관리 목록 정렬');
   assert.ok(search); assert.ok(sort);
   search.value='alpha@gmail.com'; search.events.input();
+  await new Promise(resolve=>setTimeout(resolve,120));
   assert.match(textOf(root),/현재 페이지 검색 결과: 신청 1명/);
   assert.match(textOf(root),/가입 승인 대기 \(1 표시 \/ 전체 2\)/);
   assert.match(textOf(root),/가 학생/);

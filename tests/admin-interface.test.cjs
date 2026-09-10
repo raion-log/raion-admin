@@ -4,6 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+const academySource = fs.readFileSync(path.join(__dirname, '../academy-admin.js'), 'utf8');
 
 test('UV editor direct add appears before approval queues and writes an approved member', () => {
   const direct = source.indexOf('<h3>에디터 회원 직접 추가</h3>');
@@ -36,4 +37,5 @@ test('sortable headers are scoped, use native keyboard buttons, and editor bulk 
   assert.match(source, /const visibleIds = new Set\(edRowsOf\(kind\)\.map\(member => member\.id\)\)/);
   assert.match(source, /const ids = \[\.\.\.edSel\[kind\]\]\.filter\(id => visibleIds\.has\(id\)\)/);
   assert.match(source, /setAttribute\('aria-sort'/);
+  assert.match(academySource, /searchTimer=setTimeout\(\(\)=>\{ searchTimer=undefined; onChange\(search\.value,sort\.value,result\); \},100\)/);
 });
