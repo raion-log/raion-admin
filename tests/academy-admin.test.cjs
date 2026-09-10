@@ -123,6 +123,32 @@ test('academy work uses one screen without inner tabs and keeps a compact overvi
   assert.match(textOf(root),/현재 입장 가능한 기수\s+0개\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
   assert.match(textOf(root),/가입 승인 대기 \(0\).*수강생 관리 \(0\).*기수·수강 명단/);
 });
+test('direct roster entry is the first academy work card and keeps account approval separate',async()=>{
+  const calls=[];
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    if(args.action==='admin_snapshot') return {data:{...copy,cohorts:[cohort]}};
+    return {data:{ok:true}};
+  });
+  await admin.load();
+  const content=root.querySelectorAll('div').find(node=>node.className==='academy-view');
+  assert.match(textOf(content.children[0]),/수강생 직접 추가.*로그인 계정을 만들거나 바로 입장을 승인하는 동작은 아닙니다/);
+  assert.match(textOf(content.children[1]),/현재 입장 가능한 기수/);
+
+  const direct=content.children[0];
+  const select=direct.querySelectorAll('select')[0]; select.value='1'; select.selectedOptions=[{textContent:'유유스 1기'}];
+  const inputs=direct.querySelectorAll('input');
+  inputs.find(node=>node.placeholder==='수강생 이름').value='테스트 학생';
+  inputs.find(node=>node.placeholder==='Gmail 아이디').value='Test.Student+academy';
+  inputs.find(node=>node.placeholder==='끝 4자리').value='1234';
+  inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='신청서 대조';
+  await findButton(direct,'수강 명단에 추가').events.click();
+  assert.equal(calls[1].action,'roster_add');
+  assert.equal(calls[1].payload.gmail_local_id,'test.student+academy');
+  assert.equal(calls[1].payload.cohort_id,1);
+  assert.equal(calls[1].payload.reason,'신청서 대조');
+});
 test('cohorts and roster share one card while cohort access is expressed as open or closed',async()=>{
   const snapshot={...copy,cohorts:[
     {id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:3,starts_on:null,ends_on:null},

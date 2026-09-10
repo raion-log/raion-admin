@@ -8,7 +8,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="academy-admin.css?v=20260910-5">
+  <link rel="stylesheet" href="academy-admin.css?v=20260910-6">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -70,6 +70,9 @@
 
     /* 테이블 */
     table { width: 100%; border-collapse: collapse; }
+    .table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+    .table-scroll table { min-width: 760px; }
+    .table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     th { text-align: left; font-size: 12px; color: var(--text3); text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
     td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
     tr:hover td { background: rgba(255,215,0,0.03); }
@@ -90,6 +93,9 @@
     /* 세션 */
     .session-info { font-size: 12px; color: var(--text3); }
     .session-ext { color: var(--blue); }
+    .session-table { table-layout: auto; }
+    .session-table .session-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .form-help { margin: -8px 0 16px; color: var(--text2); font-size: 13px; line-height: 1.6; }
 
     /* 빈 상태 */
     .empty { text-align: center; padding: 40px; color: var(--text3); }
@@ -146,6 +152,47 @@
     .admin-badge { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text3); }
     .admin-badge b { color: var(--accent); font-weight: 600; }
     .flex-1 { flex: 1; }
+
+    @media (max-width: 900px) {
+      .container { width: 100%; padding: 18px; }
+      header { align-items: flex-start; gap: 16px; }
+      .admin-badge { flex-wrap: wrap; justify-content: flex-end; }
+      .tabs { overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+      .tab { flex: 0 0 auto; min-height: 44px; }
+      .session-table colgroup, .session-table thead { display: none; }
+      .session-table, .session-table tbody, .session-table tr, .session-table td { display: block; width: 100%; }
+      .session-table tr { padding: 12px 0; border-bottom: 1px solid var(--border); }
+      .session-table tr:hover td { background: transparent; }
+      .session-table td { display: grid; grid-template-columns: minmax(112px, 30%) minmax(0, 1fr); gap: 12px; padding: 7px 0; border: 0; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; }
+      .session-table td::before { content: attr(data-label); color: var(--text3); font-size: 12px; font-weight: 600; }
+      .session-table td.session-empty { display: block; padding: 32px 12px; text-align: center; }
+      .session-table td.session-empty::before { content: none; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 14px; }
+      header { margin-bottom: 20px; flex-direction: column; }
+      header h1 { font-size: 23px; }
+      .admin-badge { width: 100%; justify-content: flex-start; }
+      .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+      .tab { width: 100%; padding: 10px 8px; }
+      .subtabs { overflow-x: auto; }
+      .subtab { flex: 0 0 auto; min-height: 44px; }
+      .card { padding: 16px; }
+      .form-row, .search-bar { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+      .form-group, .form-group input, .form-group select, .search-bar input, .search-bar select { width: 100% !important; min-width: 0; }
+      .form-group input, .form-group select, .search-bar input, .search-bar select { min-height: 44px; font-size: 16px; }
+      .form-row > .btn, .search-bar > .btn { width: 100%; min-height: 44px; justify-content: center; }
+      .actions { flex-wrap: wrap; }
+      .session-actions .btn { min-height: 44px; }
+      .toast { left: 14px; right: 14px; bottom: 14px; }
+      .modal-actions { flex-direction: column-reverse; }
+      .modal-actions .btn { width: 100%; min-height: 44px; justify-content: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
@@ -258,6 +305,7 @@
               <button class="btn btn-small btn-primary" id="bulk-submit">일괄 등록</button>
             </div>
           </div>
+          <div class="table-scroll" role="region" aria-label="확장프로그램 대량 등록 미리보기" tabindex="0">
           <table>
             <thead>
               <tr>
@@ -271,6 +319,7 @@
             </thead>
             <tbody id="bulk-list"></tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -359,7 +408,7 @@
             <option value="registered">Registered</option>
           </select>
         </div>
-        <table style="table-layout: fixed; width: 100%;">
+        <table class="session-table">
           <colgroup>
             <col style="width: 18%;">
             <col style="width: 22%;">
@@ -381,7 +430,7 @@
             </tr>
           </thead>
           <tbody id="session-list">
-            <tr><td colspan="7" class="empty">로딩 중...</td></tr>
+            <tr><td colspan="7" class="empty session-empty">로딩 중...</td></tr>
           </tbody>
         </table>
       </div>
@@ -518,6 +567,51 @@
       </div>
 
       <div id="sub-editor-members">
+        <div class="card">
+          <h3>에디터 회원 직접 추가</h3>
+          <p class="form-help">가입 신청 없이 에디터 이용 회원을 바로 등록합니다. 등록 즉시 승인 상태가 되므로 이메일과 이용 기간을 확인해주세요.</p>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="ed-add-email">이메일</label>
+              <input type="email" id="ed-add-email" placeholder="user@gmail.com" autocomplete="off" required>
+            </div>
+            <div class="form-group flex-1">
+              <label for="ed-add-name">성함</label>
+              <input type="text" id="ed-add-name" placeholder="홍길동" maxlength="40" autocomplete="off" required>
+            </div>
+            <div class="form-group">
+              <label for="ed-add-phone">연락처 끝 4자리</label>
+              <input type="text" id="ed-add-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="ed-add-cohort">기수</label>
+              <select id="ed-add-cohort" style="min-width:120px;"><option value="">(없음)</option></select>
+            </div>
+            <div class="form-group">
+              <label for="ed-add-type">유형</label>
+              <select id="ed-add-type">
+                <option value="student">수강생</option><option value="subscription">구독</option>
+                <option value="staff">내부</option><option value="event">이벤트</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ed-add-duration">이용 기간</label>
+              <input type="number" id="ed-add-duration" value="1" min="1" max="120" style="width:90px;">
+            </div>
+            <div class="form-group">
+              <label for="ed-add-unit">기간 단위</label>
+              <select id="ed-add-unit"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
+            </div>
+            <div class="form-group">
+              <label for="ed-add-max-devices">허용 기기</label>
+              <input type="number" id="ed-add-max-devices" value="2" min="1" max="10" style="width:90px;">
+            </div>
+            <button class="btn btn-primary" id="ed-add-submit" type="button" onclick="addEditorMember()">바로 추가</button>
+          </div>
+        </div>
+
         <!-- 승인 대기 -->
         <div class="card">
           <h3>가입 승인 대기 (<span id="ed-pending-count">0</span>)</h3>
@@ -541,6 +635,7 @@
             <button class="btn btn-small btn-outline" onclick="edBulkField('pending','cohort')">기수 적용</button>
             <button class="btn btn-small btn-outline" onclick="edClearSel('pending')">선택 해제</button>
           </div>
+          <div class="table-scroll" role="region" aria-label="에디터 가입 승인 대기 목록" tabindex="0">
           <table>
             <thead><tr>
               <th style="width:28px;"><input type="checkbox" onchange="edToggleAll('pending', this.checked)"></th>
@@ -548,6 +643,7 @@
             </tr></thead>
             <tbody id="ed-pending-body"></tbody>
           </table>
+          </div>
           <div id="ed-pending-empty" class="empty hidden">승인 대기 중인 가입자가 없습니다.</div>
         </div>
 
@@ -586,6 +682,7 @@
             <button class="btn btn-small btn-danger" onclick="edBulkStatus('member','blocked')">선택 차단</button>
             <button class="btn btn-small btn-outline" onclick="edClearSel('member')">선택 해제</button>
           </div>
+          <div class="table-scroll" role="region" aria-label="승인된 에디터 회원 목록" tabindex="0">
           <table>
             <thead><tr>
               <th style="width:28px;"><input type="checkbox" onchange="edToggleAll('member', this.checked)"></th>
@@ -594,6 +691,7 @@
             </tr></thead>
             <tbody id="ed-member-body"></tbody>
           </table>
+          </div>
           <div id="ed-member-empty" class="empty hidden">승인된 회원이 없습니다.</div>
         </div>
       </div>
@@ -628,10 +726,12 @@
               <input type="text" id="ed-code-memo" placeholder="선택사항"></div>
             <button class="btn btn-primary" onclick="addEditorCode()">코드 추가</button>
           </div>
+          <div class="table-scroll" role="region" aria-label="에디터 추천 코드 목록" tabindex="0">
           <table>
             <thead><tr><th>코드</th><th>유형</th><th>기수</th><th>메모</th><th>활성</th><th>관리</th></tr></thead>
             <tbody id="ed-code-body"></tbody>
           </table>
+          </div>
           <div id="ed-code-empty" class="empty hidden">등록된 코드가 없습니다.</div>
         </div>
       </div>
@@ -695,7 +795,7 @@
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-  <script src="academy-admin.js?v=20260910-5"></script>
+  <script src="academy-admin.js?v=20260910-6"></script>
   <script>
     // ========== Supabase 설정 ==========
     // service_role 키는 제거됨. 브라우저에는 공개키(anon)만 두고,
@@ -768,6 +868,8 @@
       const el = document.createElement('div');
       el.className = `toast toast-${type}`;
       el.textContent = msg;
+      el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+      el.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 3000);
     }
@@ -1107,7 +1209,7 @@
         sessionsData = await supabaseGet('sessions', 'order=last_active.desc');
         renderSessions();
       } catch (err) {
-        document.getElementById('session-list').innerHTML = `<tr><td colspan="5" class="empty" style="color: var(--red);">오류: ${err.message}</td></tr>`;
+        document.getElementById('session-list').innerHTML = '<tr><td colspan="7" class="empty session-empty" style="color: var(--red);">세션 정보를 불러오지 못했습니다</td></tr>';
       }
     }
 
@@ -1167,7 +1269,7 @@
       document.getElementById('session-count').textContent = rows.length + (rows.length !== Object.keys(grouped).length ? `/${Object.keys(grouped).length}` : '');
 
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty">${sessionsData.length === 0 ? '세션이 없습니다' : '검색 결과가 없습니다'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty session-empty">${sessionsData.length === 0 ? '세션이 없습니다' : '검색 결과가 없습니다'}</td></tr>`;
         return;
       }
 
@@ -1179,20 +1281,29 @@
         } else {
           activeHtml = '미사용';
         }
-        const allowedHtml = r.allowedExts.map(e => `<span class="ext-tag ext-tag-${e}">${e}</span>`).join(' ');
+        const extensionTag = (extension, active = false) => {
+          const className = VALID_EXTENSIONS.includes(extension) ? ` ext-tag-${extension}` : '';
+          const glow = active ? ' style="box-shadow: 0 0 6px rgba(39,174,96,0.5);"' : '';
+          return `<span class="ext-tag${className}"${glow}>${edEsc(extension)}</span>`;
+        };
+        const allowedHtml = r.allowedExts.map(e => extensionTag(e)).join(' ');
         const activeExtHtml = r.activeExts.length > 0
-          ? r.activeExts.map(e => `<span class="ext-tag ext-tag-${e}" style="box-shadow: 0 0 6px rgba(39,174,96,0.5);">${e}</span>`).join(' ')
+          ? r.activeExts.map(e => extensionTag(e, true)).join(' ')
           : '<span style="color: var(--text3); font-size: 12px;">없음</span>';
-        const kickBtns = r.activeIds.map(s => `<button class="btn btn-small btn-danger" onclick="kickSession('${s.id}', '${r.email}')" style="font-size: 11px; padding: 4px 8px; white-space: nowrap;">종료 ${s.ext}</button>`).join(' ');
+        const kickBtns = r.activeIds.map(s => {
+          const sessionId = edEsc(JSON.stringify(String(s.id)));
+          const email = edEsc(JSON.stringify(String(r.email)));
+          return `<button class="btn btn-small btn-danger" onclick="kickSession(${sessionId}, ${email})" style="font-size: 11px; padding: 4px 8px; white-space: nowrap;">종료 ${edEsc(s.ext)}</button>`;
+        }).join(' ');
         return `
           <tr style="${!r.hasActive ? 'opacity: 0.6;' : ''}">
-            <td style="overflow: hidden; text-overflow: ellipsis;">${r.email}</td>
-            <td style="white-space: normal; word-break: break-word;">${allowedHtml}</td>
-            <td style="white-space: normal; word-break: break-word;">${activeExtHtml}</td>
-            <td style="color: var(--text2); font-size: 12px;">${r.cohort || '-'}</td>
-            <td style="color: var(--text3); font-size: 12px; overflow: hidden; text-overflow: ellipsis;">${r.memo || '-'}</td>
-            <td class="session-info">${activeHtml}</td>
-            <td style="white-space: normal;">${kickBtns}</td>
+            <td data-label="이메일" aria-label="이메일" style="overflow: hidden; text-overflow: ellipsis;">${edEsc(r.email)}</td>
+            <td data-label="허용 확장프로그램" aria-label="허용 확장프로그램" style="white-space: normal; word-break: break-word;">${allowedHtml}</td>
+            <td data-label="활성 중" aria-label="활성 중" style="white-space: normal; word-break: break-word;">${activeExtHtml}</td>
+            <td data-label="기수" aria-label="기수" style="color: var(--text2); font-size: 12px;">${edEsc(r.cohort || '-')}</td>
+            <td data-label="메모" aria-label="메모" style="color: var(--text3); font-size: 12px; overflow: hidden; text-overflow: ellipsis;">${edEsc(r.memo || '-')}</td>
+            <td data-label="마지막 활동" aria-label="마지막 활동" class="session-info">${activeHtml}</td>
+            <td data-label="액션" aria-label="액션"><div class="session-actions">${kickBtns}</div></td>
           </tr>
         `;
       }).join('');
@@ -1991,9 +2102,66 @@
     function edFillCohortSelects() {
       const opts = '<option value="">(없음)</option>' +
         editorCohorts.map(c => `<option value="${edEsc(c)}">${edEsc(c)}</option>`).join('');
-      ['ed-bulk-cohort','ed-mbulk-cohort'].forEach(id => {
+      ['ed-add-cohort','ed-bulk-cohort','ed-mbulk-cohort'].forEach(id => {
         const el = document.getElementById(id); if (el) el.innerHTML = opts;
       });
+    }
+
+    async function addEditorMember() {
+      const emailInput = document.getElementById('ed-add-email');
+      const nameInput = document.getElementById('ed-add-name');
+      const phoneInput = document.getElementById('ed-add-phone');
+      const email = emailInput.value.trim().toLowerCase();
+      const name = nameInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const cohort = document.getElementById('ed-add-cohort').value || null;
+      const memberType = document.getElementById('ed-add-type').value;
+      const amount = Number(document.getElementById('ed-add-duration').value);
+      const unit = document.getElementById('ed-add-unit').value;
+      const maxDevices = Number(document.getElementById('ed-add-max-devices').value);
+      const submit = document.getElementById('ed-add-submit');
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        toast('올바른 이메일을 입력해주세요', 'error'); emailInput.focus(); return;
+      }
+      if (!name) { toast('성함을 입력해주세요', 'error'); nameInput.focus(); return; }
+      if (phone && !/^[0-9]{4}$/.test(phone)) {
+        toast('연락처는 끝 4자리 숫자만 입력해주세요', 'error'); phoneInput.focus(); return;
+      }
+      if (!Number.isInteger(amount) || amount < 1 || amount > 120) {
+        toast('이용 기간은 1~120 사이로 입력해주세요', 'error'); document.getElementById('ed-add-duration').focus(); return;
+      }
+      if (!Number.isInteger(maxDevices) || maxDevices < 1 || maxDevices > 10) {
+        toast('허용 기기는 1~10대로 입력해주세요', 'error'); document.getElementById('ed-add-max-devices').focus(); return;
+      }
+      if (!confirm(`${email} 회원을 승인 상태로 바로 추가할까요?`)) return;
+
+      const now = new Date();
+      submit.disabled = true;
+      try {
+        await supabasePost('uvengers_editor_members', {
+          email,
+          name,
+          phone_last4: phone || null,
+          cohort,
+          member_type: memberType,
+          status: 'approved',
+          started_at: now.toISOString(),
+          valid_until: edAddPeriod(now, amount, unit),
+          max_devices: maxDevices
+        });
+        toast('에디터 회원을 추가했습니다', 'success');
+        emailInput.value = '';
+        nameInput.value = '';
+        phoneInput.value = '';
+        await loadEditorMembers();
+        emailInput.focus();
+      } catch (error) {
+        const duplicate = /duplicate|unique|already exists/i.test(error.message || '');
+        toast(duplicate ? '이미 등록된 이메일입니다' : '회원 추가에 실패했습니다. 권한과 입력값을 확인해주세요', 'error');
+      } finally {
+        submit.disabled = false;
+      }
     }
 
     // 일괄 처리 공통 — 한 건씩 보내고 성공/실패를 세어 보고한다.

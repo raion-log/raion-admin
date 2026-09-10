@@ -258,21 +258,33 @@
       }
       return section;
     }
-    function rosterManagement(rows, cohorts) {
-      const section=el('section',undefined,'academy-management-group'); section.appendChild(el('h4','수강 명단'));
-      section.appendChild(el('p','필수 열은 기수·이름·Gmail 아이디·휴대폰 끝 4자리입니다. 주문/신청 번호는 선택 입력이며 비밀번호와 전체 휴대폰 번호는 받지 않습니다.','academy-notice'));
+    function rosterAdd(cohorts) {
+      const section=el('section',undefined,'academy-card academy-direct-add');
+      section.append(
+        el('h3','수강생 직접 추가'),
+        el('p','가입 승인에 사용할 수강 명단을 먼저 등록합니다. 로그인 계정을 만들거나 바로 입장을 승인하는 동작은 아닙니다.','academy-notice')
+      );
       const cohort=cohortField(cohorts.filter(row=>['draft','enrollment','active'].includes(row.status)));
       const name=input('text','수강생 이름'); name.maxLength=40; name.required=true;
-      const gmail=input('text','Gmail 아이디'); gmail.required=true;
+      const gmail=input('text','Gmail 아이디'); gmail.required=true; gmail.maxLength=64; gmail.autocapitalize='none';
       const phone=input('text','끝 4자리'); phone.inputMode='numeric'; phone.maxLength=4; phone.required=true;
       const reference=input('text','선택: 주문/신청 번호'); reference.maxLength=80;
       const reason=reasonField(); const fields=el('div',undefined,'academy-fields');
       fields.append(field('기수',cohort),field('이름',name),field('Gmail 아이디 (@gmail.com 고정)',gmail),field('휴대폰 끝 4자리',phone),field('외부 참조 번호 (선택)',reference),field('등록 사유',reason));
       const addAction = button('수강 명단에 추가',()=>{
-        if(!cohort.value || !name.value.trim() || !gmail.value.trim() || !/^[0-9]{4}$/.test(phone.value)) { message('기수·이름·Gmail 아이디·휴대폰 끝 4자리를 확인해주세요.',true); cohort.focus(); return; }
-        return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmail.value.trim(),phone_last_four:phone.value,source_reference:reference.value.trim()},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
+        const gmailLocal=gmail.value.trim().toLowerCase();
+        if(!cohort.value) { message('기수를 선택해주세요.',true); cohort.focus(); return; }
+        if(name.value.trim().length<2) { message('수강생 이름을 2자 이상 입력해주세요.',true); name.focus(); return; }
+        if(!/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) { message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요.',true); gmail.focus(); return; }
+        if(!/^[0-9]{4}$/.test(phone.value)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.',true); phone.focus(); return; }
+        return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmailLocal,phone_last_four:phone.value,source_reference:reference.value.trim()},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
       },'primary');
-      section.appendChild(disclosure('수강 명단 추가', [fields, addAction]));
+      section.append(fields, addAction);
+      return section;
+    }
+    function rosterManagement(rows) {
+      const section=el('section',undefined,'academy-management-group'); section.appendChild(el('h4','수강 명단'));
+      section.appendChild(el('p','기수·이름·Gmail 아이디·휴대폰 끝 4자리로 가입 신청을 대조합니다. 비밀번호와 전체 휴대폰 번호는 저장하지 않습니다.','academy-notice'));
       const labels={eligible:'승인 대기 가능',bound:'계정 연결 완료',cancelled:'명단 취소'};
       for(const row of rows) {
         const card=record(row, 'h5'); card.appendChild(el('p',`${row.cohort_name} · ${labels[row.status] || row.status}${row.source_reference ? ` · 참조 ${row.source_reference}` : ''}`));
@@ -333,8 +345,8 @@
         if (data?.version !== 2 || !['applications', 'students', 'cohorts', 'roster', 'audit'].every(key => Array.isArray(data[key]))) throw new Error('invalid_contract');
         const content = el('div', undefined, 'academy-view');
         const management = el('section', undefined, 'academy-card');
-        management.append(el('h3', '기수·수강 명단'), cohortManagement(data.cohorts), rosterManagement(data.roster.slice(0, 100), data.cohorts));
-        content.append(summary(data), applications(data.applications, data.totals?.applications, data.audit), students(data.students, data.totals?.students, data.audit), management, pagination(data));
+        management.append(el('h3', '기수·수강 명단'), cohortManagement(data.cohorts), rosterManagement(data.roster.slice(0, 100)));
+        content.append(rosterAdd(data.cohorts), summary(data), applications(data.applications, data.totals?.applications, data.audit), students(data.students, data.totals?.students, data.audit), management, pagination(data));
         root.append(content);
         message(successMessage || '학습실 전용 권한과 최신 정보를 확인했습니다.');
         loaded = true;
