@@ -8,7 +8,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="academy-admin.css?v=20260910-8">
+  <link rel="stylesheet" href="academy-admin.css?v=20260911-1">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -18,7 +18,7 @@
       --red: #e94560; --green: #27ae60; --blue: #3498db;
     }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-    .container { max-width: 1600px; margin: 0 auto; padding: 24px; width: 98%; }
+    .container { max-width: 1600px; margin: 0 auto; padding: 24px; width: 98%; min-width: 0; }
 
     /* 헤더 */
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
@@ -48,7 +48,9 @@
     .card h3 { font-size: 16px; margin-bottom: 16px; color: var(--accent); }
 
     /* 폼 */
-    .form-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: end; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; align-items: end; }
+    .form-row > * { min-width: 0; }
+    .form-row > .form-group.flex-1 { min-width: min(180px, 100%); }
     .form-group { display: flex; flex-direction: column; gap: 4px; }
     .form-group label { font-size: 12px; color: var(--text3); text-transform: uppercase; }
     .form-group input, .form-group select, .form-group textarea { padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
@@ -70,7 +72,7 @@
 
     /* 테이블 */
     table { width: 100%; border-collapse: collapse; }
-    .table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+    .table-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-gutter: stable; }
     .table-scroll table { min-width: 760px; }
     .table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     th { text-align: left; font-size: 12px; color: var(--text3); text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -128,6 +130,8 @@
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 
     .hidden { display: none !important; }
+    #tab-ext, #tab-uvengers, #tab-editor { width: 100%; min-width: 0; }
+    #tab-uvengers .card { min-width: 0; }
 
     /* 로그인 게이트 */
     .gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; }
@@ -497,6 +501,7 @@
           <button class="btn btn-small btn-primary" onclick="approveSelectedUvInquiries()">선택 승인</button>
           <button class="btn btn-small btn-danger" onclick="deleteSelectedUvInquiries()">선택 삭제</button>
         </div>
+        <div class="table-scroll" role="region" aria-label="유벤져스 가입 신청 목록" tabindex="0">
         <table>
           <thead>
             <tr>
@@ -515,6 +520,7 @@
             <tr><td colspan="9" class="empty">로딩 중...</td></tr>
           </tbody>
         </table>
+        </div>
         <div id="uv-empty" class="empty hidden">가입 신청이 없습니다.</div>
       </div>
 
@@ -541,6 +547,7 @@
           <button class="btn btn-small btn-primary" onclick="applyUvMemberBulkEdit()">일괄 적용</button>
           <button class="btn btn-small btn-outline" onclick="cancelUvMemberBulkEdit()">취소</button>
         </div>
+        <div class="table-scroll" role="region" aria-label="승인된 유벤져스 멤버 목록" tabindex="0">
         <table>
           <thead>
             <tr>
@@ -559,6 +566,7 @@
           </thead>
           <tbody id="uv-member-body"></tbody>
         </table>
+        </div>
         <div id="uv-member-empty" class="empty hidden">승인된 멤버가 없습니다.</div>
       </div>
     </div>
@@ -810,7 +818,7 @@
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-  <script src="academy-admin.js?v=20260910-8"></script>
+  <script src="academy-admin.js?v=20260911-1"></script>
   <script>
     // ========== Supabase 설정 ==========
     // service_role 키는 제거됨. 브라우저에는 공개키(anon)만 두고,

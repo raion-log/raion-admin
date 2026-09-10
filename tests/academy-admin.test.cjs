@@ -149,26 +149,20 @@ test('direct roster entry is the first academy work card and keeps account appro
   assert.equal(calls[1].payload.cohort_id,1);
   assert.equal(calls[1].payload.reason,'신청서 대조');
 });
-test('academy lists can be searched and sorted without adding unsafe bulk account actions',async()=>{
-  const applications=[
-    {user_id:'b',revision:1,display_name:'나 학생',canonical_gmail:'beta@gmail.com',phone_last_four:'2222',status:'pending',submitted_at:'2026-09-02T00:00:00Z',roster_matches:[]},
-    {user_id:'a',revision:1,display_name:'가 학생',canonical_gmail:'alpha@gmail.com',phone_last_four:'1111',status:'pending',submitted_at:'2026-09-01T00:00:00Z',roster_matches:[]}
+test('sorting stays inside student management and the page-wide search toolbar is absent',async()=>{
+  const students=[
+    {user_id:'b',revision:1,display_name:'나 학생',canonical_gmail:'beta@gmail.com',phone_last_four:'2222',status:'suspended',cohort_name:'유유스 2기',roster_options:[]},
+    {user_id:'a',revision:1,display_name:'가 학생',canonical_gmail:'alpha@gmail.com',phone_last_four:'1111',status:'active',cohort_name:'유유스 1기',roster_options:[]}
   ];
-  const {root,admin}=setup(async()=>({data:{...copy,applications,totals:{applications:2,students:0,roster:0}}}));
+  const {root,admin}=setup(async()=>({data:{...copy,students,totals:{applications:0,students:2,roster:0}}}));
   await admin.load();
-  const search=root.querySelectorAll('input').find(node=>node.type==='search');
-  const sort=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='현재 페이지 관리 목록 정렬');
-  assert.ok(search); assert.ok(sort);
-  search.value='alpha@gmail.com'; search.events.input();
-  await new Promise(resolve=>setTimeout(resolve,120));
-  assert.match(textOf(root),/현재 페이지 검색 결과: 신청 1명/);
-  assert.match(textOf(root),/가입 승인 대기 \(1 표시 \/ 전체 2\)/);
-  assert.match(textOf(root),/가 학생/);
-  assert.doesNotMatch(textOf(root),/나 학생/);
-  findButton(root,'검색 지우기').events.click();
-  sort.value='name'; sort.events.change();
-  const applicationSection=root.querySelectorAll('section').find(node=>textOf(node).includes('가입 승인 대기 (2)'));
-  assert.deepEqual(applicationSection.querySelectorAll('article').map(node=>node.children[0].textContent),['가 학생','나 학생']);
+  assert.doesNotMatch(textOf(root),/현재 페이지 목록 찾기|현재 페이지 관리 목록 검색|검색 지우기/);
+  const studentSection=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 관리 (2)'));
+  assert.match(textOf(studentSection),/수강생 정렬.*이름.*Gmail.*기수.*상태/);
+  await findButton(studentSection,'이름').events.click();
+  assert.deepEqual(studentSection.querySelectorAll('article').map(node=>node.children[0].textContent),['가 학생','나 학생']);
+  await findButton(studentSection,'이름 ↑').events.click();
+  assert.deepEqual(studentSection.querySelectorAll('article').map(node=>node.children[0].textContent),['나 학생','가 학생']);
   assert.doesNotMatch(textOf(root),/선택 승인|선택 정지|일괄 승인/);
 });
 test('cohorts and roster share one card while cohort access is expressed as open or closed',async()=>{

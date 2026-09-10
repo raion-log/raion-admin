@@ -37,5 +37,13 @@ test('sortable headers are scoped, use native keyboard buttons, and editor bulk 
   assert.match(source, /const visibleIds = new Set\(edRowsOf\(kind\)\.map\(member => member\.id\)\)/);
   assert.match(source, /const ids = \[\.\.\.edSel\[kind\]\]\.filter\(id => visibleIds\.has\(id\)\)/);
   assert.match(source, /setAttribute\('aria-sort'/);
-  assert.match(academySource, /searchTimer=setTimeout\(\(\)=>\{ searchTimer=undefined; onChange\(search\.value,sort\.value,result\); \},100\)/);
+  assert.doesNotMatch(academySource, /현재 페이지 목록 찾기|academy-list-controls/);
+  assert.match(academySource, /\[\['name', '이름'\], \['email', 'Gmail'\], \['cohort', '기수'\], \['status', '상태'\]\]/);
+});
+
+test('uvengers tables stay inside labelled responsive scroll regions', () => {
+  assert.match(source, /<div class="table-scroll" role="region" aria-label="유벤져스 가입 신청 목록" tabindex="0">\s*<table>/);
+  assert.match(source, /<div class="table-scroll" role="region" aria-label="승인된 유벤져스 멤버 목록" tabindex="0">\s*<table>/);
+  assert.match(source, /\.form-row \{ display: flex; flex-wrap: wrap;/);
+  assert.match(source, /#tab-ext, #tab-uvengers, #tab-editor \{ width: 100%; min-width: 0; \}/);
 });
