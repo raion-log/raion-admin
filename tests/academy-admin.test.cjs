@@ -184,10 +184,20 @@ test('cohorts and roster share one card while cohort access is expressed as open
   assert.ok(management);
   assert.match(textOf(management),/기수·수강 명단.*기수.*수강 명단/);
   assert.match(textOf(management),/수강생 입장 열림.*수강생 입장 닫힘.*수강생 입장 예정.*수강생 입장 기간 종료/);
+  assert.match(textOf(management),/운영 기간.*주소 코드/);
   assert.doesNotMatch(textOf(management),/1기 · 유유스 1기/);
   assert.ok(findButton(management,'입장 닫기'));
   assert.ok(findButton(management,'입장 열기'));
   assert.doesNotMatch(textOf(management),/운영 상태|명단 접수|보관/);
+});
+test('an empty roster explains the next action and returns focus to direct entry',async()=>{
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
+  const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort]}}));
+  await admin.load();
+  assert.match(textOf(root),/아직 등록된 수강 명단이 없습니다.*위의 수강생 직접 추가/);
+  const directSelect=root.querySelectorAll('select').find(node=>node.children.some(option=>option.textContent==='유유스 1기'));
+  await findButton(root,'수강생 직접 추가로 이동').events.click();
+  assert.equal(directSelect.focused,true);
 });
 test('cohort creation rejects an invalid address code and reversed dates before an RPC write',async()=>{
   const calls=[];

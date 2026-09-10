@@ -24,9 +24,30 @@
 .academy-admin .academy-list-result { min-height: 20px; margin: 8px 0 0; color: var(--text2, #b0b0b0); font-size: 12px; }
 
 .academy-admin .academy-card { background: var(--bg2, #111); border: 1px solid var(--border, #2a2a2a); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.academy-admin .academy-management-card > .academy-notice { margin-top: -8px; }
 .academy-admin .academy-card > .academy-record:first-of-type { border-top: 0; }
 .academy-admin .academy-management-group + .academy-management-group { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-management-group > h4 { font-size: 15px; margin-bottom: 6px; }
+.academy-admin .academy-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.academy-admin .academy-section-heading h4 { font-size: 15px; margin: 0 0 4px; }
+.academy-admin .academy-section-heading p { margin-bottom: 0; }
+.academy-admin .academy-cohort-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px; margin-top: 12px; }
+.academy-admin .academy-cohort-card { min-width: 0; padding: 14px; background: var(--bg3, #1a1a1a); border: 1px solid var(--border, #2a2a2a); border-radius: 10px; }
+.academy-admin .academy-record-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.academy-admin .academy-record-heading h5 { min-width: 0; margin: 0; }
+.academy-admin .academy-state { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border: 1px solid var(--border, #2a2a2a); border-radius: 999px; color: var(--text2, #b0b0b0); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.academy-admin .academy-state-open { border-color: #5b8d70; color: #a9e2be; background: rgba(72, 125, 91, .18); }
+.academy-admin .academy-state-closed { background: rgba(255, 255, 255, .035); }
+.academy-admin .academy-cohort-meta { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 18px; margin: 12px 0 0; }
+.academy-admin .academy-meta-item { min-width: 0; }
+.academy-admin .academy-meta-item dt { margin-bottom: 3px; color: var(--text2, #b0b0b0); font-size: 12px; }
+.academy-admin .academy-meta-item dd { margin: 0; color: var(--text, #e8e8e8); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.academy-admin .academy-roster-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; color: var(--text2, #b0b0b0); font-size: 12px; }
+.academy-admin .academy-empty-state { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px dashed var(--border, #2a2a2a); border-radius: 10px; background: rgba(255, 255, 255, .02); }
+.academy-admin .academy-empty-state strong { display: block; margin-bottom: 4px; color: var(--text, #e8e8e8); font-size: 14px; }
+.academy-admin .academy-empty-state p { margin: 0; }
+.academy-admin .academy-empty-state .btn { flex: none; }
+.academy-admin .academy-empty-copy { margin: 0; padding: 14px; border: 1px dashed var(--border, #2a2a2a); border-radius: 10px; color: var(--text2, #b0b0b0); font-size: 13px; }
 .academy-admin .academy-record { padding: 16px 0; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-record:last-child { padding-bottom: 0; }
 .academy-admin .academy-record p { color: var(--text2, #b0b0b0); font-size: 13px; }
@@ -64,6 +85,10 @@
   .academy-admin label { min-width: 0; }
   .academy-admin input, .academy-admin select { font-size: 16px; }
   .academy-admin .academy-card { padding: 16px; }
+  .academy-admin .academy-record-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .academy-admin .academy-cohort-meta { grid-template-columns: 1fr; }
+  .academy-admin .academy-empty-state { align-items: stretch; flex-direction: column; }
+  .academy-admin .academy-empty-state .btn { width: 100%; justify-content: center; }
   .academy-admin .btn { min-height: 44px; }
   .academy-admin .academy-actions { display: grid; grid-template-columns: 1fr; }
   .academy-admin .academy-record .btn { width: 100%; justify-content: center; }

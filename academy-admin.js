@@ -219,9 +219,24 @@
       if (row.ends_on && row.ends_on < today) return { current: false, label: '수강생 입장 기간 종료' };
       return { current: true, label: '수강생 입장 열림' };
     }
+    function managementHeading(title, description) {
+      const heading = el('div', undefined, 'academy-section-heading');
+      const copy = el('div');
+      copy.append(el('h4', title), el('p', description, 'academy-notice'));
+      heading.appendChild(copy);
+      return heading;
+    }
+    function metaItem(label, value) {
+      const item = el('div', undefined, 'academy-meta-item');
+      item.append(el('dt', label), el('dd', value));
+      return item;
+    }
+    function stateBadge(label, current = false) {
+      return el('span', label, `academy-state ${current ? 'academy-state-open' : 'academy-state-closed'}`);
+    }
     function cohortManagement(rows) {
-      const section = el('section', undefined, 'academy-management-group');
-      section.append(el('h4', '기수'), el('p', '기수를 만든 뒤 수강생 입장을 열면 해당 기간의 승인된 수강생만 학습실에 들어올 수 있습니다.', 'academy-notice'));
+      const section = el('section', undefined, 'academy-management-group academy-cohort-management');
+      section.appendChild(managementHeading('기수 운영', '기수별 입장 상태와 운영 기간을 확인합니다. 입장을 열어도 설정 기간 밖에서는 접속할 수 없습니다.'));
       const number = input('number', '예: 2'); number.min = '1'; number.required = true;
       const name = input('text', '예: 유유스 2기'); name.maxLength = 60; name.required = true;
       const slug = input('text', '예: 2gi'); slug.maxLength = 40; slug.required = true;
@@ -236,16 +251,22 @@
         return mutate('cohort_create',{cohort_number:Number(number.value),name:name.value.trim(),slug:slugValue,status:'draft',starts_on:starts.value,ends_on:ends.value},reason,`${name.value.trim()} 기수를 닫힌 상태로 등록할까요?`);
       },'primary');
       section.appendChild(disclosure('새 기수 추가', [el('p', '새 기수는 수강생 입장이 닫힌 상태로 만들어집니다.', 'academy-notice'), fields, createAction]));
+      const cohortList=el('div',undefined,'academy-cohort-list');
+      if(!rows.length) cohortList.appendChild(el('p','등록된 기수가 없습니다. 새 기수를 먼저 추가해주세요.','academy-empty-copy'));
       for(const row of rows) {
-        const card=el('article',undefined,'academy-record');
+        const card=el('article',undefined,'academy-cohort-card');
         const isOpen=row.status==='active';
         const access=cohortAccess(row);
         const numberLabel=`${row.cohort_number}기`;
         const heading=String(row.name).includes(numberLabel) ? row.name : `${numberLabel} · ${row.name}`;
-        card.append(
-          el('h5',heading),
-          el('p',`${access.label} · ${row.starts_on || '시작일 미정'} ~ ${row.ends_on || '종료일 미정'} · 주소 코드 ${row.slug}`)
+        const cardHeading=el('div',undefined,'academy-record-heading');
+        cardHeading.append(el('h5',heading),stateBadge(access.label,access.current));
+        const meta=el('dl',undefined,'academy-cohort-meta');
+        meta.append(
+          metaItem('운영 기간',`${row.starts_on || '시작일 미정'} ~ ${row.ends_on || '종료일 미정'}`),
+          metaItem('주소 코드',row.slug)
         );
+        card.append(cardHeading,meta);
         const changeReason=reasonField();
         const actionLabel=isOpen ? '입장 닫기' : '입장 열기';
         const targetStatus=isOpen ? 'completed' : 'active';
@@ -256,8 +277,9 @@
           edit,
           button(actionLabel,()=>mutate('cohort_set_status',{cohort_id:row.id,revision:row.revision,status:targetStatus},changeReason,`${row.name} 수강생 입장을 ${isOpen ? '닫을까요?' : '열까요?'}`),isOpen ? 'danger' : 'primary')
         ]));
-        section.appendChild(card);
+        cohortList.appendChild(card);
       }
+      section.appendChild(cohortList);
       return section;
     }
     function rosterAdd(cohorts) {
@@ -282,15 +304,27 @@
         return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmailLocal,phone_last_four:phone.value,source_reference:reference.value.trim()},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
       },'primary');
       section.append(fields, addAction);
+      section.focusPrimary=()=>cohort.focus();
       return section;
     }
-    function rosterManagement(rows, total = rows.length, filtered = false) {
+    function rosterManagement(rows, total = rows.length, filtered = false, focusDirectAdd) {
       const count = filtered ? `${rows.length} 표시 / 전체 ${total}` : total;
-      const section=el('section',undefined,'academy-management-group'); section.appendChild(el('h4',`수강 명단 (${count})`));
-      section.appendChild(el('p','기수·이름·Gmail 아이디·휴대폰 끝 4자리로 가입 신청을 대조합니다. 비밀번호와 전체 휴대폰 번호는 저장하지 않습니다.','academy-notice'));
+      const section=el('section',undefined,'academy-management-group academy-roster-management');
+      section.appendChild(managementHeading(`수강 명단 (${count})`,'가입 신청과 대조할 기수·이름·Gmail·휴대폰 끝 4자리를 확인합니다. 비밀번호와 전체 휴대폰 번호는 저장하지 않습니다.'));
       const labels={eligible:'승인 대기 가능',bound:'계정 연결 완료',cancelled:'명단 취소'};
+      if(!rows.length) {
+        const empty=el('div',undefined,'academy-empty-state');
+        const copy=el('div');
+        copy.append(el('strong',filtered ? '검색 조건에 맞는 명단이 없습니다.' : '아직 등록된 수강 명단이 없습니다.'),el('p',filtered ? '검색어를 바꾸거나 검색을 지워주세요.' : '위의 수강생 직접 추가에서 첫 명단을 등록할 수 있습니다.','academy-notice'));
+        empty.appendChild(copy);
+        if(!filtered && focusDirectAdd) empty.appendChild(button('수강생 직접 추가로 이동',focusDirectAdd));
+        section.appendChild(empty);
+      }
       for(const row of rows) {
-        const card=record(row, 'h5'); card.appendChild(el('p',`${row.cohort_name} · ${labels[row.status] || row.status}${row.source_reference ? ` · 참조 ${row.source_reference}` : ''}`));
+        const card=record(row, 'h5');
+        const rosterState=el('div',undefined,'academy-roster-state');
+        rosterState.append(stateBadge(labels[row.status] || row.status,row.status==='bound'),el('span',`${row.cohort_name}${row.source_reference ? ` · 참조 ${row.source_reference}` : ''}`));
+        card.appendChild(rosterState);
         if(row.status!=='bound') {
           const editName=input('text'); editName.value=row.display_name; editName.maxLength=40;
           const editGmail=input('text'); editGmail.value=String(row.canonical_gmail).replace(/@gmail\.com$/,'');
@@ -396,8 +430,9 @@
         const content = el('div', undefined, 'academy-view');
         const applicationHost=el('div'); const studentHost=el('div'); const rosterHost=el('div');
         const rosterPage=data.roster.slice(0,100);
-        const management = el('section', undefined, 'academy-card');
-        management.append(el('h3', '기수·수강 명단'), cohortManagement(data.cohorts), rosterHost);
+        const management = el('section', undefined, 'academy-card academy-management-card');
+        management.append(el('h3', '기수·수강 명단'), el('p','입장 가능한 기수를 관리하고, 가입 승인에 사용할 명단을 확인합니다.','academy-notice'), cohortManagement(data.cohorts), rosterHost);
+        const directAdd=rosterAdd(data.cohorts);
         const renderLists=(queryValue,sortMode,result)=>{
           if(token !== epoch) return;
           const query=String(queryValue || '').trim().toLowerCase();
@@ -407,7 +442,7 @@
           const visibleRoster=filter(rosterPage);
           applicationHost.replaceChildren(applications(visibleApplications,data.totals?.applications,data.audit,Boolean(query)));
           studentHost.replaceChildren(students(visibleStudents,data.totals?.students,data.audit,Boolean(query)));
-          rosterHost.replaceChildren(rosterManagement(visibleRoster,data.totals?.roster,Boolean(query)));
+          rosterHost.replaceChildren(rosterManagement(visibleRoster,data.totals?.roster,Boolean(query),()=>directAdd.focusPrimary()));
           if(result) result.textContent=query
             ? `현재 페이지 검색 결과: 신청 ${visibleApplications.length}명 · 수강생 ${visibleStudents.length}명 · 명단 ${visibleRoster.length}명`
             : '현재 페이지 목록을 검색하거나 정렬할 수 있습니다.';
@@ -415,7 +450,7 @@
         const visibleTotal=data.applications.length+data.students.length+rosterPage.length;
         const controls=visibleTotal ? listControls(renderLists) : null;
         renderLists('','default');
-        content.append(rosterAdd(data.cohorts), summary(data));
+        content.append(directAdd, summary(data));
         if(controls) content.appendChild(controls);
         content.append(applicationHost,studentHost,management,pagination(data));
         root.append(content);
