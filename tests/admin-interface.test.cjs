@@ -24,3 +24,16 @@ test('active sessions switch to labelled cards in a narrow window', () => {
   assert.match(source, /@media \(max-width: 640px\)[\s\S]*\.tabs \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(source, /\.form-row, \.search-bar \{ display: grid; grid-template-columns: minmax\(0, 1fr\)/);
 });
+
+test('sortable headers are scoped, use native keyboard buttons, and editor bulk actions stay within the visible selection', () => {
+  assert.match(source, /document\.querySelectorAll\('th\[data-sort\]'\)\.forEach/);
+  assert.doesNotMatch(source, /document\.querySelectorAll\('th\.sortable'\)\.forEach\(th => \{\s*th\.addEventListener\('click'/);
+  assert.match(source, /trigger\.type = 'button'/);
+  assert.match(source, /trigger\.className = 'sort-button'/);
+  assert.match(source, /trigger\.setAttribute\('aria-label', `\$\{label\} 정렬`\)/);
+  assert.match(source, /data-editor-kind="pending" data-editor-sort="created_at"/);
+  assert.match(source, /data-editor-kind="member" data-editor-sort="device_count"/);
+  assert.match(source, /const visibleIds = new Set\(edRowsOf\(kind\)\.map\(member => member\.id\)\)/);
+  assert.match(source, /const ids = \[\.\.\.edSel\[kind\]\]\.filter\(id => visibleIds\.has\(id\)\)/);
+  assert.match(source, /setAttribute\('aria-sort'/);
+});
