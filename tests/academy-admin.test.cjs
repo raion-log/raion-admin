@@ -149,6 +149,8 @@ test('direct roster entry is the first academy work card and keeps account appro
   assert.equal(calls[1].payload.cohort_id,1);
   assert.equal(calls[1].payload.source_reference,'');
   assert.equal(calls[1].payload.reason,'신청서 대조');
+  const rosterFilter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
+  assert.equal(rosterFilter.value,'1');
   assert.doesNotMatch(textOf(direct),/외부 참조|주문\/신청 번호/);
 });
 test('current roster stays prominent while cancelled and internal reference records stay secondary',async()=>{
@@ -162,6 +164,62 @@ test('current roster stays prominent while cancelled and internal reference reco
   assert.match(textOf(management),/등록 명단.*1명.*현재 학생.*가입 전.*취소된 명단.*1건/);
   assert.doesNotMatch(textOf(management),/INTERNAL-CURRENT|INTERNAL-OLD|외부 참조 번호/);
   assert.match(textOf(root),/현재 명단\s+1명/);
+});
+test('a bound roster row points to student management instead of exposing invalid roster edits',async()=>{
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1};
+  const bound={id:2,cohort_id:1,revision:2,user_id:'student',display_name:'연결 학생',canonical_gmail:'bound@gmail.com',phone_last_four:'1002',cohort_name:'유유스 1기',status:'bound',source_reference:''};
+  const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort],roster:[bound],totals:{applications:0,students:1,roster:1}}}));
+  await admin.load();
+  const record=root.querySelectorAll('article').find(node=>textOf(node).includes('bound@gmail.com'));
+  assert.match(textOf(record),/계정 연결됨.*수강생 관리에서 변경/);
+  assert.equal(findButton(record,'수정'),undefined);
+  assert.equal(findButton(record,'취소'),undefined);
+});
+test('roster cohort filter stays beside the list and each row owns its edit and cancel actions',async()=>{
+  const calls=[];
+  const cohorts=[
+    {id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1},
+    {id:2,cohort_number:2,name:'유유스 2기',slug:'2gi',status:'draft',revision:1}
+  ];
+  const roster=[
+    {id:11,cohort_id:1,revision:1,user_id:null,display_name:'첫 학생',canonical_gmail:'first@gmail.com',phone_last_four:'1111',cohort_name:'유유스 1기',status:'eligible',source_reference:''},
+    {id:22,cohort_id:2,revision:3,user_id:null,display_name:'둘 학생',canonical_gmail:'second@gmail.com',phone_last_four:'2222',cohort_name:'유유스 2기',status:'eligible',source_reference:''}
+  ];
+  const snapshot={...copy,cohorts,roster,totals:{applications:0,students:0,roster:2}};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    return args.action==='admin_snapshot' ? {data:snapshot} : {data:{ok:true}};
+  });
+  await admin.load();
+  let filter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
+  assert.deepEqual(filter.children.map(option=>option.textContent),['전체 기수 · 2명','유유스 1기 · 1명','유유스 2기 · 1명']);
+  filter.value='2';
+  filter.events.change();
+  filter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
+  assert.equal(filter.focused,true);
+  const visibleRoster=root.querySelectorAll('article').filter(node=>textOf(node).includes('@gmail.com'));
+  assert.equal(visibleRoster.length,1);
+  assert.match(textOf(visibleRoster[0]),/둘 학생.*유유스 2기/);
+  assert.doesNotMatch(textOf(visibleRoster[0]),/첫 학생/);
+
+  findButton(visibleRoster[0],'수정').events.click();
+  const editAction=findButton(visibleRoster[0],'수정');
+  assert.equal(editAction.attrs['aria-expanded'],'true');
+  const editInputs=visibleRoster[0].querySelectorAll('input');
+  editInputs.find(node=>node.value==='둘 학생').value='둘째 학생';
+  editInputs.find(node=>node.value==='second').value='Second.Updated';
+  editInputs.find(node=>node.value==='2222').value='2323';
+  editInputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='연락처 확인';
+  await findButton(visibleRoster[0],'수정 내용 저장').events.click();
+  assert.equal(calls[1].action,'roster_update');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[1].payload)),{roster_entry_id:22,revision:3,display_name:'둘째 학생',gmail_local_id:'second.updated',phone_last_four:'2323',source_reference:'',reason:'연락처 확인'});
+
+  const refreshedRoster=root.querySelectorAll('article').find(node=>textOf(node).includes('second@gmail.com'));
+  findButton(refreshedRoster,'취소').events.click();
+  refreshedRoster.querySelectorAll('input').filter(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').at(-1).value='등록 오류';
+  await findButton(refreshedRoster,'명단 취소하기').events.click();
+  assert.equal(calls[3].action,'roster_cancel');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[3].payload)),{roster_entry_id:22,revision:3,reason:'등록 오류'});
 });
 test('sorting stays inside student management and the page-wide search toolbar is absent',async()=>{
   const students=[
@@ -287,6 +345,8 @@ test('the client displays at most 100 roster rows to match its pagination step',
   const management=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-card'));
   const rosterRecords=management.querySelectorAll('article').filter(node=>textOf(node).includes('@gmail.com'));
   assert.equal(rosterRecords.length,100);
+  const filter=management.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
+  assert.match(filter.children[0].textContent,/현재 페이지 전체 · 100명/);
 });
 test('a later page keeps its previous-page escape when totals shrink',async()=>{
   const snapshot={...copy,totals:{applications:0,students:0,roster:100}};

@@ -30,6 +30,18 @@
 .academy-admin .academy-roster-add .academy-fields label:last-child { grid-column: 1 / -1; }
 .academy-admin .academy-roster-management { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-roster-management > .academy-disclosure { margin-top: 16px; }
+.academy-admin .academy-roster-controls { display: flex; flex: none; align-items: flex-end; gap: 8px; }
+.academy-admin .academy-roster-filter { flex: 0 1 220px; min-width: 180px; }
+.academy-admin .academy-roster-filter select { min-height: 44px; }
+.academy-admin .academy-roster-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.academy-admin .academy-roster-identity { min-width: 0; }
+.academy-admin .academy-roster-identity p { margin-bottom: 0; }
+.academy-admin .academy-roster-actions { display: flex; flex: none; gap: 8px; }
+.academy-admin .academy-roster-actions .btn { min-width: 68px; min-height: 44px; }
+.academy-admin .academy-roster-readonly { align-self: center; color: var(--text2, #b0b0b0); font-size: 12px; white-space: nowrap; }
+.academy-admin .academy-roster-panel { margin-top: 12px; padding: 14px; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; background: var(--bg3, #1a1a1a); }
+.academy-admin .academy-roster-panel[hidden] { display: none; }
+.academy-admin .academy-roster-panel .academy-fields { margin-top: 0; }
 .academy-admin .academy-card > .academy-record:first-of-type { border-top: 0; }
 .academy-admin .academy-management-group + .academy-management-group { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-management-group > h4 { font-size: 15px; margin-bottom: 6px; }
@@ -91,6 +103,13 @@
   .academy-admin label { min-width: 0; }
   .academy-admin input, .academy-admin select { font-size: 16px; }
   .academy-admin .academy-card { padding: 16px; }
+  .academy-admin .academy-roster-management > .academy-section-heading { align-items: stretch; flex-direction: column; }
+  .academy-admin .academy-roster-controls { align-items: stretch; }
+  .academy-admin .academy-roster-filter { flex: 1 1 auto; min-width: 0; }
+  .academy-admin .academy-roster-row { flex-direction: column; }
+  .academy-admin .academy-roster-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .academy-admin .academy-roster-actions .btn { width: 100%; }
+  .academy-admin .academy-roster-panel { padding: 12px; }
   .academy-admin .academy-record-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .academy-admin .academy-cohort-meta { grid-template-columns: 1fr; }
   .academy-admin .academy-empty-state { align-items: stretch; flex-direction: column; }
