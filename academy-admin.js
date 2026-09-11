@@ -67,7 +67,7 @@
       root.setAttribute('aria-busy', String(value));
     }
     function field(label, input) {
-      const wrapper = el('label', label);
+      const wrapper = el('label', input.required ? `${label} (필수)` : label);
       wrapper.appendChild(input);
       return wrapper;
     }
@@ -79,6 +79,7 @@
     }
     function cohortField(cohorts) {
       const select = el('select');
+      select.required = true;
       const empty = el('option', '배정할 기수를 선택하세요'); empty.value = '';
       select.appendChild(empty);
       for (const cohort of cohorts) {
@@ -271,6 +272,11 @@
       heading.appendChild(copy);
       return heading;
     }
+    function countBadge(value) {
+      const badge = el('span', value, 'academy-count');
+      badge.setAttribute('aria-label', `총 ${value}`);
+      return badge;
+    }
     function metaItem(label, value) {
       const item = el('div', undefined, 'academy-meta-item');
       item.append(el('dt', label), el('dd', value));
@@ -280,18 +286,19 @@
       return el('span', label, `academy-state ${current ? 'academy-state-open' : 'academy-state-closed'}`);
     }
     function cohortManagement(rows) {
-      const section = el('section', undefined, 'academy-management-group academy-cohort-management');
-      section.appendChild(managementHeading('기수 운영', '기수별 입장 상태와 운영 기간을 확인합니다. 입장을 열어도 설정 기간 밖에서는 접속할 수 없습니다.'));
+      const section = el('section', undefined, 'academy-card academy-cohort-management');
+      section.append(
+        el('h3', '기수 관리'),
+        el('p', '기수별 운영 기간과 수강생 입장을 관리합니다. 평소에는 현재 상태만 확인하면 됩니다.', 'academy-notice')
+      );
       const number = input('number', '예: 2'); number.min = '1'; number.required = true;
       const name = input('text', '예: 유유스 2기'); name.maxLength = 60; name.required = true;
-      const slug = input('text', '예: 2gi'); slug.maxLength = 40; slug.required = true;
       const starts = input('date'); const ends = input('date'); const reason = reasonField();
       const fields=el('div',undefined,'academy-fields');
-      fields.append(field('기수 번호',number),field('표시 이름',name),field('주소 코드',slug),field('시작일',starts),field('종료일',ends),field('등록 사유',reason));
+      fields.append(field('기수 번호',number),field('표시 이름',name),field('시작일',starts),field('종료일',ends),field('등록 사유',reason));
       const createAction = button('새 기수 등록',()=>{
-        if(!number.value || !name.value.trim() || !slug.value.trim()) { message('기수 번호·표시 이름·주소 코드를 모두 입력해주세요.',true); number.focus(); return; }
-        const slugValue=slug.value.trim().toLowerCase();
-        if(!/^[a-z0-9][a-z0-9-]{0,39}$/.test(slugValue)) { message('주소 코드는 영문 소문자·숫자·하이픈만 사용할 수 있습니다.',true); slug.focus(); return; }
+        if(!number.value || !name.value.trim()) { message('기수 번호와 표시 이름을 모두 입력해주세요.',true); number.focus(); return; }
+        const slugValue=`${Number(number.value)}gi`;
         if(starts.value && ends.value && starts.value>ends.value) { message('종료일은 시작일보다 빠를 수 없습니다.',true); ends.focus(); return; }
         return mutate('cohort_create',{cohort_number:Number(number.value),name:name.value.trim(),slug:slugValue,status:'draft',starts_on:starts.value,ends_on:ends.value},reason,`${name.value.trim()} 기수를 닫힌 상태로 등록할까요?`);
       },'primary');
@@ -308,8 +315,7 @@
         cardHeading.append(el('h5',heading),stateBadge(access.label,access.current));
         const meta=el('dl',undefined,'academy-cohort-meta');
         meta.append(
-          metaItem('운영 기간',`${row.starts_on || '시작일 미정'} ~ ${row.ends_on || '종료일 미정'}`),
-          metaItem('주소 코드',row.slug)
+          metaItem('운영 기간',`${row.starts_on || '시작일 미정'} ~ ${row.ends_on || '종료일 미정'}`)
         );
         card.append(cardHeading,meta);
         const changeReason=reasonField();
@@ -328,62 +334,69 @@
       return section;
     }
     function rosterAdd(cohorts) {
-      const section=el('section',undefined,'academy-card academy-direct-add');
+      const section=el('section',undefined,'academy-roster-add academy-direct-add');
       section.append(
-        el('h3','수강생 직접 추가'),
-        el('p','가입 승인에 사용할 수강 명단을 먼저 등록합니다. 로그인 계정을 만들거나 바로 입장을 승인하는 동작은 아닙니다.','academy-notice')
+        managementHeading('수강생 추가', '이름·Gmail·휴대폰 끝 4자리를 등록하면 가입할 때 같은 정보로 자동 확인합니다.')
       );
       const cohort=cohortField(cohorts.filter(row=>['draft','enrollment','active'].includes(row.status)));
       const name=input('text','수강생 이름'); name.maxLength=40; name.required=true;
       const gmail=input('text','Gmail 아이디'); gmail.required=true; gmail.maxLength=64; gmail.autocapitalize='none';
       const phone=input('text','끝 4자리'); phone.inputMode='numeric'; phone.maxLength=4; phone.required=true;
-      const reference=input('text','선택: 주문/신청 번호'); reference.maxLength=80;
       const reason=reasonField(); const fields=el('div',undefined,'academy-fields');
-      fields.append(field('기수',cohort),field('이름',name),field('Gmail 아이디 (@gmail.com 고정)',gmail),field('휴대폰 끝 4자리',phone),field('외부 참조 번호 (선택)',reference),field('등록 사유',reason));
+      fields.append(field('기수',cohort),field('이름',name),field('Gmail 아이디 (@gmail.com 고정)',gmail),field('휴대폰 끝 4자리',phone),field('등록 사유',reason));
       const addAction = button('수강 명단에 추가',()=>{
         const gmailLocal=gmail.value.trim().toLowerCase();
         if(!cohort.value) { message('기수를 선택해주세요.',true); cohort.focus(); return; }
         if(name.value.trim().length<2) { message('수강생 이름을 2자 이상 입력해주세요.',true); name.focus(); return; }
         if(!/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) { message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요.',true); gmail.focus(); return; }
         if(!/^[0-9]{4}$/.test(phone.value)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.',true); phone.focus(); return; }
-        return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmailLocal,phone_last_four:phone.value,source_reference:reference.value.trim()},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
+        return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmailLocal,phone_last_four:phone.value,source_reference:''},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
       },'primary');
       section.append(fields, addAction);
       section.focusPrimary=()=>cohort.focus();
       return section;
     }
     function rosterManagement(rows, total = rows.length, filtered = false, focusDirectAdd) {
-      const count = filtered ? `${rows.length} 표시 / 전체 ${total}` : total;
+      const currentRows=rows.filter(row=>row.status!=='cancelled');
+      const cancelledRows=rows.filter(row=>row.status==='cancelled');
+      const count = filtered ? `${currentRows.length} 표시 / 전체 ${total}` : currentRows.length;
       const section=el('section',undefined,'academy-management-group academy-roster-management');
-      section.appendChild(managementHeading(`수강 명단 (${count})`,'가입 신청과 대조할 기수·이름·Gmail·휴대폰 끝 4자리를 확인합니다. 비밀번호와 전체 휴대폰 번호는 저장하지 않습니다.'));
-      const labels={eligible:'승인 대기 가능',bound:'계정 연결 완료',cancelled:'명단 취소'};
-      if(!rows.length) {
+      const heading=managementHeading('등록 명단','가입 전에는 입력 정보를 수정할 수 있고, 가입이 확인되면 계정 연결 상태로 바뀝니다.');
+      heading.appendChild(countBadge(filtered ? `${currentRows.length}/${total}명` : `${count}명`));
+      section.appendChild(heading);
+      const labels={eligible:'가입 전',bound:'계정 연결됨',cancelled:'명단 취소'};
+      if(!currentRows.length) {
         const empty=el('div',undefined,'academy-empty-state');
         const copy=el('div');
-        copy.append(el('strong',filtered ? '검색 조건에 맞는 명단이 없습니다.' : '아직 등록된 수강 명단이 없습니다.'),el('p',filtered ? '검색어를 바꾸거나 검색을 지워주세요.' : '위의 수강생 직접 추가에서 첫 명단을 등록할 수 있습니다.','academy-notice'));
+        copy.append(el('strong',filtered ? '검색 조건에 맞는 명단이 없습니다.' : '현재 사용할 수강 명단이 없습니다.'),el('p',filtered ? '검색어를 바꾸거나 검색을 지워주세요.' : '위 수강생 추가에서 명단을 등록할 수 있습니다.','academy-notice'));
         empty.appendChild(copy);
-        if(!filtered && focusDirectAdd) empty.appendChild(button('수강생 직접 추가로 이동',focusDirectAdd));
+        if(!filtered && focusDirectAdd) empty.appendChild(button('수강생 추가로 이동',focusDirectAdd));
         section.appendChild(empty);
       }
-      for(const row of rows) {
+      function rosterRecord(row) {
         const card=record(row, 'h5');
         const rosterState=el('div',undefined,'academy-roster-state');
-        rosterState.append(stateBadge(labels[row.status] || row.status,row.status==='bound'),el('span',`${row.cohort_name}${row.source_reference ? ` · 참조 ${row.source_reference}` : ''}`));
+        rosterState.append(stateBadge(labels[row.status] || row.status,row.status==='bound'),el('span',row.cohort_name));
         card.appendChild(rosterState);
         if(row.status!=='bound') {
           const editName=input('text'); editName.value=row.display_name; editName.maxLength=40;
           const editGmail=input('text'); editGmail.value=String(row.canonical_gmail).replace(/@gmail\.com$/,'');
           const editPhone=input('text'); editPhone.value=row.phone_last_four; editPhone.inputMode='numeric'; editPhone.maxLength=4;
-          const editReference=input('text'); editReference.value=row.source_reference || ''; editReference.maxLength=80;
           const editReason=reasonField(); const editFields=el('div',undefined,'academy-fields');
-          editFields.append(field('이름',editName),field('Gmail 아이디 (@gmail.com 고정)',editGmail),field('휴대폰 끝 4자리',editPhone),field('외부 참조 번호 (선택)',editReference),field('수정 사유',editReason));
-          card.appendChild(disclosure('명단 정보 관리', [editFields, button(row.status==='cancelled' ? '수정하고 명단 복구' : '명단 정보 수정',()=>mutate('roster_update',{roster_entry_id:row.id,revision:row.revision,display_name:editName.value.trim(),gmail_local_id:editGmail.value.trim(),phone_last_four:editPhone.value,source_reference:editReference.value.trim()},editReason,`${row.display_name} 학생의 ${row.cohort_name} 명단 정보를 저장할까요?`))]));
+          editFields.append(field('이름',editName),field('Gmail 아이디 (@gmail.com 고정)',editGmail),field('휴대폰 끝 4자리',editPhone),field('수정 사유',editReason));
+          card.appendChild(disclosure('명단 정보 수정', [editFields, button(row.status==='cancelled' ? '수정하고 명단 복구' : '명단 정보 저장',()=>mutate('roster_update',{roster_entry_id:row.id,revision:row.revision,display_name:editName.value.trim(),gmail_local_id:editGmail.value.trim(),phone_last_four:editPhone.value,source_reference:row.source_reference || ''},editReason,`${row.display_name} 학생의 ${row.cohort_name} 명단 정보를 저장할까요?`))]));
         }
         if(row.status==='eligible') {
           const cancelReason=reasonField();
           card.appendChild(disclosure('명단 취소', [field('취소 사유',cancelReason),button('명단 취소',()=>mutate('roster_cancel',{roster_entry_id:row.id,revision:row.revision},cancelReason,`${row.display_name} 학생의 ${row.cohort_name} 명단을 취소할까요?`),'danger')]));
         }
-        section.appendChild(card);
+        return card;
+      }
+      for(const row of currentRows) section.appendChild(rosterRecord(row));
+      if(cancelledRows.length) {
+        const cancelled=el('div');
+        for(const row of cancelledRows) cancelled.appendChild(rosterRecord(row));
+        section.appendChild(disclosure('취소된 명단', [cancelled], `${cancelledRows.length}건`));
       }
       return section;
     }
@@ -396,8 +409,11 @@
         return item;
       };
       const activeCohorts = data.cohorts.filter(row => cohortAccess(row).current).length;
+      const activeRosterCount = data.roster.filter(row => row.status !== 'cancelled').length;
+      const rosterCountLabel = (data.totals?.roster || 0) > data.roster.length ? `${activeRosterCount}+명` : `${activeRosterCount}명`;
       section.append(
         metric('현재 입장 가능한 기수', `${activeCohorts}개`),
+        metric('현재 명단', rosterCountLabel),
         metric('가입 승인 대기', `${data.totals?.applications ?? data.applications.length}명`),
         metric('등록 수강생', `${data.totals?.students ?? data.students.length}명`)
       );
@@ -428,12 +444,13 @@
         const content = el('div', undefined, 'academy-view');
         const rosterHost=el('div');
         const rosterPage=data.roster.slice(0,100);
-        const management = el('section', undefined, 'academy-card academy-management-card');
-        management.append(el('h3', '기수·수강 명단'), el('p','입장 가능한 기수를 관리하고, 가입 승인에 사용할 명단을 확인합니다.','academy-notice'), cohortManagement(data.cohorts), rosterHost);
+        const management = el('section', undefined, 'academy-card academy-management-card academy-roster-card');
+        management.append(el('h3', '수강 명단 관리'), el('p','등록한 명단과 실제 가입 정보를 대조해 해당 기수로 연결합니다.','academy-notice'));
         const directAdd=rosterAdd(data.cohorts);
         rosterHost.replaceChildren(rosterManagement(rosterPage,data.totals?.roster,false,()=>directAdd.focusPrimary()));
-        content.append(directAdd, summary(data));
-        content.append(applications(data.applications,data.totals?.applications,data.audit),students(data.students,data.totals?.students,data.audit),management,pagination(data));
+        management.append(directAdd, rosterHost);
+        content.append(management, summary(data));
+        content.append(applications(data.applications,data.totals?.applications,data.audit),students(data.students,data.totals?.students,data.audit),cohortManagement(data.cohorts),pagination(data));
         root.append(content);
         message(successMessage || '학습실 전용 권한과 최신 정보를 확인했습니다.');
         loaded = true;

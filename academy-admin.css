@@ -18,12 +18,18 @@
 .academy-admin .academy-overview-item { display: inline-flex; align-items: baseline; gap: 7px; min-width: 0; }
 .academy-admin .academy-overview-label { color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-overview-value { color: var(--text, #e8e8e8); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.academy-admin .academy-count { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border: 1px solid var(--border, #2a2a2a); border-radius: 999px; color: var(--text, #e8e8e8); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .academy-admin .academy-student-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-student-sort-label { margin-right: 4px; color: var(--text2, #b0b0b0); font-size: 12px; font-weight: 600; }
 .academy-admin .academy-sort-button[aria-pressed="true"] { border-color: var(--accent, #ffd700); color: var(--accent, #ffd700); }
 
 .academy-admin .academy-card { background: var(--bg2, #111); border: 1px solid var(--border, #2a2a2a); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
 .academy-admin .academy-management-card > .academy-notice { margin-top: -8px; }
+.academy-admin .academy-roster-add { margin-top: 20px; }
+.academy-admin .academy-roster-add .academy-fields { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(140px, .9fr) minmax(220px, 1.25fr) minmax(150px, .8fr); align-items: end; }
+.academy-admin .academy-roster-add .academy-fields label:last-child { grid-column: 1 / -1; }
+.academy-admin .academy-roster-management { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
+.academy-admin .academy-roster-management > .academy-disclosure { margin-top: 16px; }
 .academy-admin .academy-card > .academy-record:first-of-type { border-top: 0; }
 .academy-admin .academy-management-group + .academy-management-group { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-management-group > h4 { font-size: 15px; margin-bottom: 6px; }
@@ -37,7 +43,7 @@
 .academy-admin .academy-state { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border: 1px solid var(--border, #2a2a2a); border-radius: 999px; color: var(--text2, #b0b0b0); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .academy-admin .academy-state-open { border-color: #5b8d70; color: #a9e2be; background: rgba(72, 125, 91, .18); }
 .academy-admin .academy-state-closed { background: rgba(255, 255, 255, .035); }
-.academy-admin .academy-cohort-meta { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 18px; margin: 12px 0 0; }
+.academy-admin .academy-cohort-meta { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px 18px; margin: 12px 0 0; }
 .academy-admin .academy-meta-item { min-width: 0; }
 .academy-admin .academy-meta-item dt { margin-bottom: 3px; color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-meta-item dd { margin: 0; color: var(--text, #e8e8e8); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -80,6 +86,8 @@
   .academy-admin .academy-overview { gap: 8px 18px; padding: 12px 14px; }
   .academy-admin .academy-student-sort-label { flex-basis: 100%; }
   .academy-admin .academy-fields { display: grid; grid-template-columns: 1fr; }
+  .academy-admin .academy-roster-add .academy-fields { grid-template-columns: 1fr; }
+  .academy-admin .academy-roster-add .academy-fields label:last-child { grid-column: auto; }
   .academy-admin label { min-width: 0; }
   .academy-admin input, .academy-admin select { font-size: 16px; }
   .academy-admin .academy-card { padding: 16px; }

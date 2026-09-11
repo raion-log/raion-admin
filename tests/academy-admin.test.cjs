@@ -120,8 +120,8 @@ test('academy work uses one screen without inner tabs and keeps a compact overvi
   assert.equal(findButton(root,'명단 관리'),undefined);
   assert.equal(findButton(root,'변경 기록'),undefined);
   assert.equal(root.querySelectorAll('button').filter(node=>node.attrs.role==='tab').length,0);
-  assert.match(textOf(root),/현재 입장 가능한 기수\s+0개\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
-  assert.match(textOf(root),/가입 승인 대기 \(0\).*수강생 관리 \(0\).*기수·수강 명단/);
+  assert.match(textOf(root),/현재 입장 가능한 기수\s+0개\s+현재 명단\s+0명\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
+  assert.match(textOf(root),/수강 명단 관리.*가입 승인 대기 \(0\).*수강생 관리 \(0\).*기수 관리/);
 });
 test('direct roster entry is the first academy work card and keeps account approval separate',async()=>{
   const calls=[];
@@ -133,7 +133,7 @@ test('direct roster entry is the first academy work card and keeps account appro
   });
   await admin.load();
   const content=root.querySelectorAll('div').find(node=>node.className==='academy-view');
-  assert.match(textOf(content.children[0]),/수강생 직접 추가.*로그인 계정을 만들거나 바로 입장을 승인하는 동작은 아닙니다/);
+  assert.match(textOf(content.children[0]),/수강 명단 관리.*수강생 추가.*가입할 때 같은 정보로 자동 확인/);
   assert.match(textOf(content.children[1]),/현재 입장 가능한 기수/);
 
   const direct=content.children[0];
@@ -147,7 +147,21 @@ test('direct roster entry is the first academy work card and keeps account appro
   assert.equal(calls[1].action,'roster_add');
   assert.equal(calls[1].payload.gmail_local_id,'test.student+academy');
   assert.equal(calls[1].payload.cohort_id,1);
+  assert.equal(calls[1].payload.source_reference,'');
   assert.equal(calls[1].payload.reason,'신청서 대조');
+  assert.doesNotMatch(textOf(direct),/외부 참조|주문\/신청 번호/);
+});
+test('current roster stays prominent while cancelled and internal reference records stay secondary',async()=>{
+  const roster=[
+    {id:2,revision:1,user_id:null,display_name:'현재 학생',canonical_gmail:'current@gmail.com',phone_last_four:'0402',cohort_name:'유유스 1기',status:'eligible',source_reference:'INTERNAL-CURRENT'},
+    {id:1,revision:2,user_id:null,display_name:'지난 테스트',canonical_gmail:'old@gmail.com',phone_last_four:'0000',cohort_name:'유유스 1기',status:'cancelled',source_reference:'INTERNAL-OLD'}
+  ];
+  const {root,admin}=setup(async()=>({data:{...copy,roster,totals:{applications:0,students:0,roster:2}}}));
+  await admin.load();
+  const management=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-card'));
+  assert.match(textOf(management),/등록 명단.*1명.*현재 학생.*가입 전.*취소된 명단.*1건/);
+  assert.doesNotMatch(textOf(management),/INTERNAL-CURRENT|INTERNAL-OLD|외부 참조 번호/);
+  assert.match(textOf(root),/현재 명단\s+1명/);
 });
 test('sorting stays inside student management and the page-wide search toolbar is absent',async()=>{
   const students=[
@@ -165,7 +179,7 @@ test('sorting stays inside student management and the page-wide search toolbar i
   assert.deepEqual(studentSection.querySelectorAll('article').map(node=>node.children[0].textContent),['나 학생','가 학생']);
   assert.doesNotMatch(textOf(root),/선택 승인|선택 정지|일괄 승인/);
 });
-test('cohorts and roster share one card while cohort access is expressed as open or closed',async()=>{
+test('roster and cohort management use separate clear cards while cohort access stays explicit',async()=>{
   const snapshot={...copy,cohorts:[
     {id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:3,starts_on:null,ends_on:null},
     {id:2,cohort_number:2,name:'유유스 2기',slug:'2gi',status:'draft',revision:1,starts_on:null,ends_on:null},
@@ -174,26 +188,27 @@ test('cohorts and roster share one card while cohort access is expressed as open
   ]};
   const {root,admin}=setup(async()=>({data:snapshot}));
   await admin.load();
-  const management=root.querySelectorAll('section').find(node=>textOf(node).includes('기수·수강 명단'));
-  assert.ok(management);
-  assert.match(textOf(management),/기수·수강 명단.*기수.*수강 명단/);
-  assert.match(textOf(management),/수강생 입장 열림.*수강생 입장 닫힘.*수강생 입장 예정.*수강생 입장 기간 종료/);
-  assert.match(textOf(management),/운영 기간.*주소 코드/);
-  assert.doesNotMatch(textOf(management),/1기 · 유유스 1기/);
-  assert.ok(findButton(management,'입장 닫기'));
-  assert.ok(findButton(management,'입장 열기'));
-  assert.doesNotMatch(textOf(management),/운영 상태|명단 접수|보관/);
+  const roster=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-card'));
+  const cohorts=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-cohort-management'));
+  assert.ok(roster); assert.ok(cohorts);
+  assert.doesNotMatch(textOf(roster),/기수 관리|주소 코드|참조 번호/);
+  assert.match(textOf(cohorts),/기수 관리.*수강생 입장 열림.*수강생 입장 닫힘.*수강생 입장 예정.*수강생 입장 기간 종료/);
+  assert.match(textOf(cohorts),/운영 기간/);
+  assert.doesNotMatch(textOf(cohorts),/주소 코드|1기 · 유유스 1기/);
+  assert.ok(findButton(cohorts,'입장 닫기'));
+  assert.ok(findButton(cohorts,'입장 열기'));
+  assert.doesNotMatch(textOf(cohorts),/운영 상태|명단 접수|보관/);
 });
 test('an empty roster explains the next action and returns focus to direct entry',async()=>{
   const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
   const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort]}}));
   await admin.load();
-  assert.match(textOf(root),/아직 등록된 수강 명단이 없습니다.*위의 수강생 직접 추가/);
+  assert.match(textOf(root),/현재 사용할 수강 명단이 없습니다.*위 수강생 추가/);
   const directSelect=root.querySelectorAll('select').find(node=>node.children.some(option=>option.textContent==='유유스 1기'));
-  await findButton(root,'수강생 직접 추가로 이동').events.click();
+  await findButton(root,'수강생 추가로 이동').events.click();
   assert.equal(directSelect.focused,true);
 });
-test('cohort creation rejects an invalid address code and reversed dates before an RPC write',async()=>{
+test('cohort creation generates its internal address code and rejects reversed dates',async()=>{
   const calls=[];
   const {root,admin}=setup(async(_name,args)=>{calls.push(args);return {data:copy};});
   await admin.load();
@@ -201,12 +216,6 @@ test('cohort creation rejects an invalid address code and reversed dates before 
   const inputs=create.querySelectorAll('input');
   inputs.find(node=>node.placeholder==='예: 2').value='3';
   inputs.find(node=>node.placeholder==='예: 유유스 2기').value='유유스 3기';
-  const slug=inputs.find(node=>node.placeholder==='예: 2gi');
-  slug.value='3기';
-  await findButton(create,'새 기수 등록').events.click();
-  assert.equal(calls.length,1);
-  assert.match(textOf(root),/주소 코드는 영문 소문자/);
-  slug.value='3gi';
   const dates=inputs.filter(node=>node.type==='date');
   dates[0].value='2026-10-02'; dates[1].value='2026-10-01';
   await findButton(create,'새 기수 등록').events.click();
@@ -225,11 +234,11 @@ test('new cohorts start closed and cohort access buttons keep revision and reaso
   const create=root.querySelectorAll('details').find(node=>textOf(node).includes('새 기수 추가'));
   create.querySelectorAll('input').find(node=>node.placeholder==='예: 2').value='3';
   create.querySelectorAll('input').find(node=>node.placeholder==='예: 유유스 2기').value='유유스 3기';
-  create.querySelectorAll('input').find(node=>node.placeholder==='예: 2gi').value='3gi';
   create.querySelectorAll('input').find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='3기 준비';
   await findButton(create,'새 기수 등록').events.click();
   assert.equal(calls[1].action,'cohort_create');
   assert.equal(calls[1].payload.status,'draft');
+  assert.equal(calls[1].payload.slug,'3gi');
 
   const cohortRecord=root.querySelectorAll('article').find(node=>textOf(node).includes('유유스 2기'));
   cohortRecord.querySelectorAll('input').find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='개강 확인';
@@ -275,7 +284,7 @@ test('the client displays at most 100 roster rows to match its pagination step',
   const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
   const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort],roster,totals:{applications:0,students:0,roster:150}}}));
   await admin.load();
-  const management=root.querySelectorAll('section').find(node=>textOf(node).includes('기수·수강 명단'));
+  const management=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-card'));
   const rosterRecords=management.querySelectorAll('article').filter(node=>textOf(node).includes('@gmail.com'));
   assert.equal(rosterRecords.length,100);
 });
