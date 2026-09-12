@@ -6,14 +6,53 @@ const test = require('node:test');
 const source = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 const academySource = fs.readFileSync(path.join(__dirname, '../academy-admin.js'), 'utf8');
 
-test('UV editor direct add appears before approval queues and writes an approved member', () => {
+test('UV editor direct add appears before approval queues and goes through the server function', () => {
   const direct = source.indexOf('<h3>에디터 회원 직접 추가</h3>');
   const pending = source.indexOf('<h3>가입 승인 대기');
   assert.ok(direct > 0 && direct < pending);
   assert.match(source, /async function addEditorMember\(\)/);
-  assert.match(source, /supabasePost\('uvengers_editor_members',[\s\S]*status: 'approved'/);
+  // uvengers_editor_members.id is a reference to auth.users(id), so the account must exist
+  // first and only service_role can create it. A browser INSERT can never succeed: it was
+  // silently broken from 2026-09-10 until 2026-09-12 because this test only looked for a
+  // string in the source.
+  assert.match(source, /supabaseFunction\('editor-admin-add-member', \{/);
+  assert.doesNotMatch(source, /supabasePost\('uvengers_editor_members'/);
   assert.match(source, /phone_last4: phone \|\| null/);
   assert.match(source, /confirm\(`\$\{email\} 회원을 승인 상태로 바로 추가할까요\?`\)/);
+  // The failure must name the real cause instead of guessing at permissions and input.
+  assert.match(source, /function editorAddError\(error\)/);
+  assert.match(source, /case 'member_exists':/);
+  assert.doesNotMatch(source, /'회원 추가에 실패했습니다\. 권한과 입력값을 확인해주세요'/);
+});
+
+test('a one-time temporary password is shown where it can be copied, not in a toast', () => {
+  // Toasts disappear after 3 seconds — the admin cannot write the password down in time.
+  assert.match(source, /id="ed-add-result"/);
+  assert.match(source, /function showEditorAddResult\(out\)/);
+  assert.match(source, /navigator\.clipboard\?\.writeText/);
+  assert.match(source, /이 비밀번호는 지금만 보입니다/);
+  // An existing account keeps its own password — we never reset someone else's.
+  assert.match(source, /out\.created_account/);
+});
+
+test('pre-approval roster lets an admin queue people who have not signed up yet', () => {
+  assert.match(source, /<h3>가입 전 미리 승인/);
+  assert.match(source, /async function addPreapproved\(\)/);
+  assert.match(source, /supabasePost\('uvengers_editor_preapproved', \{/);
+  // The period must follow the sign-up date. Freezing a date here would burn the whole
+  // period for anyone who signs up weeks after being added to the roster.
+  assert.match(source, /valid_amount: amount, valid_unit: unit/);
+  assert.doesNotMatch(source, /supabasePost\('uvengers_editor_preapproved',[\s\S]{0,400}valid_until/);
+  // Names and e-mails are hand-entered; they go in as text, never as HTML.
+  assert.match(source, /td\.textContent = value/);
+  // A missing table must be visible, not swallowed into an empty list.
+  assert.match(source, /명단 기능이 아직 서버에 적용되지 않았습니다/);
+});
+
+test('DELETE sends real headers', () => {
+  // `headers` alone was a reference to a name that never existed — any DELETE threw.
+  assert.match(source, /method: 'DELETE', headers: apiHeaders\(\)/);
+  assert.doesNotMatch(source, /method: 'DELETE', headers\s*\n/);
 });
 
 test('active sessions switch to labelled cards in a narrow window', () => {
