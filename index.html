@@ -103,6 +103,12 @@
     /* 한 줄에 나란히. 좁으면 표가 가로로 스크롤된다 — 여기서 줄바꿈하면 버튼이 세로로
        쪼개져 다른 칸과 높이가 어긋난다(2026-09-13). 좁은 화면 처리는 아래 @media 에만 둔다. */
     .actions { display: flex; gap: 6px; align-items: center; }
+    /* ★단, 표 칸에 직접 붙었을 때는 flex 를 쓰지 않는다. td 에 display:flex 를 주면 그 칸은
+       더 이상 테이블 셀이 아니어서 **행 높이를 따라가지 않고**, 내용이 행 맨 위에 붙는다
+       (2026-09-13 실측: 관리 칸 높이 29 vs 같은 행 이메일 칸 42 → 단추만 위로 떴다).
+       테이블 셀로 되돌리고 td 의 vertical-align: middle 이 살아나게 둔다. */
+    td.actions { display: table-cell; vertical-align: middle; white-space: nowrap; }
+    td.actions > .btn + .btn { margin-left: 6px; }
 
     /* 세션 */
     .session-info { font-size: 12px; color: var(--text3); }

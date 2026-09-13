@@ -214,3 +214,14 @@ test('button and badge text never breaks across lines', () => {
   assert.match(source, /\.btn \{[^}]*white-space: nowrap;[^}]*\}/);
   assert.match(source, /\.badge \{[^}]*white-space: nowrap;[^}]*\}/);
 });
+
+test('an actions cell stays a table cell so it follows the row height', () => {
+  // `display:flex` on a <td> takes it out of table layout: the cell no longer stretches to the
+  // row height and its buttons sit at the top while every other column is centred.
+  // Measured 2026-09-13: 관리 칸 height 29 vs 이메일 칸 42 → after the fix both are 42.
+  assert.match(source, /td\.actions \{ display: table-cell; vertical-align: middle; white-space: nowrap; \}/);
+  assert.match(source, /td\.actions > \.btn \+ \.btn \{ margin-left: 6px; \}/);
+  // The flex rule stays for the one place that uses a <div class="actions">.
+  assert.match(source, /\.actions \{ display: flex; gap: 6px; align-items: center; \}/);
+  assert.match(source, /<div class="actions"/);
+});
