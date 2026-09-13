@@ -86,3 +86,18 @@ test('uvengers tables stay inside labelled responsive scroll regions', () => {
   assert.match(source, /\.form-row \{ display: flex; flex-wrap: wrap;/);
   assert.match(source, /#tab-ext, #tab-uvengers, #tab-editor \{ width: 100%; min-width: 0; \}/);
 });
+
+test('a member can be deleted outright, not just blocked', () => {
+  // Blocking leaves the row in place. To undo a mistaken entry the login account has to go
+  // too — otherwise that person is silently rejected on their next sign-up ("already exists",
+  // no e-mail sent).
+  assert.match(source, /async function deleteEditorMember\(id, email\)/);
+  assert.match(source, /supabaseFunction\('editor-admin-delete-member', \{ id, email \}\)/);
+  // Both lists get the button: pending applicants and approved members.
+  assert.ok((source.match(/onclick="deleteEditorMember\(/g) || []).length >= 2);
+  // The confirmation must say it cannot be undone and point at 차단 for a temporary stop.
+  assert.match(source, /되돌릴 수 없습니다/);
+  assert.match(source, /'차단'을 쓰세요/);
+  // A half-finished delete must be reported, never swallowed into a success toast.
+  assert.match(source, /case 'account_delete_failed':/);
+});

@@ -2343,6 +2343,35 @@
       }
     }
 
+    // 회원을 완전히 지운다 — 회원행 + 로그인 계정.
+    // ★「차단」은 자리를 남긴다. 잘못 넣은 것을 되돌리려면 계정까지 지워야 한다.
+    //   회원행만 지우면 계정이 남아, 그 사람이 다시 가입할 때 "이미 있는 계정"으로
+    //   조용히 막힌다(메일도 안 간다).
+    async function deleteEditorMember(id, email) {
+      if (!confirm(`${email}\n\n이 회원을 완전히 삭제할까요?\n\n· 회원 정보와 승인 기기가 사라집니다\n· 로그인 계정도 함께 지워집니다\n· 되돌릴 수 없습니다\n\n이용을 잠시 막으려는 것이라면 '차단'을 쓰세요.`)) return;
+      try {
+        const out = await supabaseFunction('editor-admin-delete-member', { id, email });
+        toast(`${out.email} 삭제했습니다`, 'success');
+        await loadEditorMembers();
+      } catch (error) {
+        toast(editorDeleteError(error), 'error');
+      }
+    }
+
+    function editorDeleteError(error) {
+      switch (error?.code) {
+        case 'not_admin':      return '삭제 권한을 확인하지 못했습니다. 다시 로그인해보세요';
+        case 'not_found':      return '이미 삭제되었거나 찾을 수 없는 회원입니다';
+        case 'not_authenticated': return '로그인이 만료되었습니다. 다시 로그인해주세요';
+        // 회원행은 지워졌는데 계정이 남은 상태 — 그대로 알려야 재가입 막힘을 눈치챈다.
+        case 'account_delete_failed':
+          return `회원 정보는 지웠지만 로그인 계정을 지우지 못했습니다${error.detail ? ' — ' + error.detail : ''}`;
+        case 'delete_failed':  return `삭제하지 못했습니다${error.detail ? ' — ' + error.detail : ''}`;
+        case '404':            return '서버 함수가 아직 배포되지 않았습니다 (editor-admin-delete-member)';
+        default:               return `삭제하지 못했습니다 (${error?.code || '원인 미상'})`;
+      }
+    }
+
     // 서버가 준 사유를 그대로 옮긴다 — 「권한과 입력값을 확인해주세요」로 뭉개면
     // 무엇을 고쳐야 하는지 알 수 없다.
     function editorAddError(error) {
@@ -2663,6 +2692,7 @@
             <select id="ed-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
             <button class="btn btn-small btn-primary" onclick="approveEditorMember('${m.id}')">승인</button>
             <button class="btn btn-small btn-danger" onclick="updateEditorMember('${m.id}', { status: 'blocked' })">거부</button>
+            <button class="btn btn-small btn-outline" onclick="deleteEditorMember('${m.id}', '${edEsc(m.email)}')">삭제</button>
           </td></tr>`;
       }).join('');
     }
@@ -2733,7 +2763,10 @@
             </div></td>
           <td><input type="number" value="${m.max_devices ?? 2}" min="1" max="10" style="${st}width:48px;text-align:center;" onchange="updateEditorMember('${m.id}', { max_devices: parseInt(this.value) })"></td>
           <td>${devList}</td>
-          <td class="actions"><button class="btn btn-small ${m.status === 'approved' ? 'btn-danger' : 'btn-primary'}" onclick="updateEditorMember('${m.id}', { status: '${m.status === 'approved' ? 'blocked' : 'approved'}' })">${m.status === 'approved' ? '차단' : '승인'}</button></td>
+          <td class="actions">
+            <button class="btn btn-small ${m.status === 'approved' ? 'btn-danger' : 'btn-primary'}" onclick="updateEditorMember('${m.id}', { status: '${m.status === 'approved' ? 'blocked' : 'approved'}' })">${m.status === 'approved' ? '차단' : '승인'}</button>
+            <button class="btn btn-small btn-outline" style="margin-top:3px;" onclick="deleteEditorMember('${m.id}', '${edEsc(m.email)}')">삭제</button>
+          </td>
         </tr>`;
       }).join('');
     }
