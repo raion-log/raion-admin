@@ -196,3 +196,13 @@ test('the Excel buttons sit beside 명단에 올리기, not on their own row', (
   assert.match(source, /\.btn-success \{ background: var\(--green\); color: #fff; \}/);
   assert.match(source, /\.btn-success:hover/);
 });
+
+test('every button reserves the same 1px border, so neighbours line up', () => {
+  // btn-outline carries a real 1px border while btn-danger/primary/success do not. With
+  // border:none on .btn the outlined 삭제 button came out 1px taller and sat 1px higher than
+  // 차단 beside it (measured 2026-09-13: 차단 t=518/h=16 vs 삭제 t=517/h=17).
+  assert.match(source, /\.btn \{ padding: 10px 20px; border: 1px solid transparent;/);
+  assert.doesNotMatch(source, /\.btn \{ padding: 10px 20px; border: none;/);
+  // The outlined variant still shows its own border colour.
+  assert.match(source, /\.btn-outline \{ background: transparent; border: 1px solid var\(--border\)/);
+});

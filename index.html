@@ -61,7 +61,10 @@
     .checkbox-group input[type="checkbox"] { accent-color: var(--accent); }
 
     /* 버튼 */
-    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    /* ★border 는 none 이 아니라 **투명 1px** 이다. btn-outline 만 실선 테두리를 갖는 탓에
+       그 단추만 1px 더 커져, 같은 줄의 차단·승인과 세로가 어긋났다(2026-09-13 실측:
+       차단 t=518/h=16 vs 삭제 t=517/h=17). 자리를 미리 비워 두면 모든 단추 높이가 같다. */
+    .btn { padding: 10px 20px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
     .btn-primary { background: var(--accent); color: #000; }
     .btn-primary:hover { background: var(--accent-hover); }
     .btn-danger { background: var(--red); color: #fff; }
