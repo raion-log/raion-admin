@@ -206,3 +206,11 @@ test('every button reserves the same 1px border, so neighbours line up', () => {
   // The outlined variant still shows its own border colour.
   assert.match(source, /\.btn-outline \{ background: transparent; border: 1px solid var\(--border\)/);
 });
+
+test('button and badge text never breaks across lines', () => {
+  // In the real console (10 members, long device UUIDs) the 관리 column got squeezed and the
+  // labels split vertically: 「차/단」, 「승/인」, 「연/장」. Other spots had already been
+  // patched with inline white-space:nowrap; fix it at the source instead.
+  assert.match(source, /\.btn \{[^}]*white-space: nowrap;[^}]*\}/);
+  assert.match(source, /\.badge \{[^}]*white-space: nowrap;[^}]*\}/);
+});
