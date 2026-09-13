@@ -66,6 +66,9 @@
     .btn-primary:hover { background: var(--accent-hover); }
     .btn-danger { background: var(--red); color: #fff; }
     .btn-danger:hover { background: #c0392b; }
+    /* 초록 — 되돌릴 수 있는 보조 작업(엑셀 양식·업로드). 노랑(주 작업)·빨강(위험)과 구분한다. */
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover { background: #1e8f4e; }
     .btn-small { padding: 6px 12px; font-size: 12px; }
     .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
     .btn-outline:hover { border-color: var(--text2); color: var(--text); }
@@ -689,9 +692,9 @@
             <button class="btn btn-primary" id="ed-pre-submit" type="button" onclick="addPreapproved()">명단에 올리기</button>
             <!-- 여러 명은 엑셀로 — 한 줄씩 넣는 이 칸과 같은 곳에 쌓인다. 그래서 같은 줄에 둔다. -->
             <span class="ed-pre-excel">
-              <button class="btn btn-outline btn-small" type="button" onclick="downloadPreapprovedTemplate()">엑셀 양식 받기</button>
-              <label class="btn btn-outline btn-small" style="cursor:pointer;" id="ed-pre-upload-label">
-                엑셀로 여러 명
+              <button class="btn btn-success btn-small" type="button" onclick="downloadPreapprovedTemplate()">엑셀 양식 받기</button>
+              <label class="btn btn-success btn-small" style="cursor:pointer;" id="ed-pre-upload-label">
+                엑셀 업로드(여러 명)
                 <input type="file" id="ed-pre-upload" accept=".xlsx,.xls,.csv" style="display:none;">
               </label>
               <span id="ed-pre-upload-status" style="font-size:12.5px;color:var(--text3);"></span>

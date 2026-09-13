@@ -190,4 +190,9 @@ test('the Excel buttons sit beside 명단에 올리기, not on their own row', (
   assert.match(row, /downloadPreapprovedTemplate\(\)/);
   assert.match(row, /id="ed-pre-upload"/);
   assert.match(source, /\.ed-pre-excel \{ display: inline-flex;/);
+  // Green marks the reversible helper actions, apart from 노랑(main) and 빨강(destructive).
+  assert.match(row, /btn btn-success btn-small[^>]*>\s*엑셀 양식 받기/);
+  assert.match(row, /btn btn-success btn-small[^>]*>\s*엑셀 업로드\(여러 명\)/);
+  assert.match(source, /\.btn-success \{ background: var\(--green\); color: #fff; \}/);
+  assert.match(source, /\.btn-success:hover/);
 });
