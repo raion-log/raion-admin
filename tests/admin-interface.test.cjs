@@ -173,3 +173,21 @@ test('Excel rows are parsed the way a real sheet hands them over', () => {
   // 모르는 유형은 조용히 수강생으로 — 서버 check 제약에 걸려 통째로 실패하는 것을 막는다
   assert.equal(parse({ '이메일': 'g@h.com', '유형': '이상한값' }).member_type, 'student');
 });
+
+test('row action buttons sit on one line, at the same height as the rest of the row', () => {
+  // A margin-top on the delete button alone pushed it below its neighbour inside a flex row,
+  // and a flex-wrap on .actions split 승인/거부/삭제 across three lines (2026-09-13).
+  assert.match(source, /\.actions \{ display: flex; gap: 6px; align-items: center; \}/);
+  // 기본 규칙(display:flex 로 시작하는 쪽)에는 flex-wrap 이 없어야 한다. 좁은 화면은 @media 에만.
+  assert.doesNotMatch(source, /\.actions \{ display: flex;[^}]*flex-wrap/);
+  assert.match(source, /@media \(max-width: 900px\)[\s\S]*\.actions \{ flex-wrap: wrap; \}/);
+  assert.doesNotMatch(source, /style="margin-top:3px;" onclick="deleteEditorMember/);
+});
+
+test('the Excel buttons sit beside 명단에 올리기, not on their own row', () => {
+  const row = source.match(/<button class="btn btn-primary" id="ed-pre-submit"[\s\S]{0,900}?<\/div>/)[0];
+  assert.match(row, /ed-pre-excel/, '같은 form-row 안에 있어야 한다');
+  assert.match(row, /downloadPreapprovedTemplate\(\)/);
+  assert.match(row, /id="ed-pre-upload"/);
+  assert.match(source, /\.ed-pre-excel \{ display: inline-flex;/);
+});

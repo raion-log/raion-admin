@@ -90,7 +90,9 @@
     .ext-tag-flow-pro { background: rgba(139,195,74,0.15); color: #b4e870; border: 1px solid rgba(139,195,74,0.35); }
     .ext-tag-genspark-hub { background: rgba(155,89,182,0.15); color: #9b59b6; border: 1px solid rgba(155,89,182,0.3); }
     .ext-tag-jp-eco { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
-    .actions { display: flex; gap: 6px; }
+    /* 한 줄에 나란히. 좁으면 표가 가로로 스크롤된다 — 여기서 줄바꿈하면 버튼이 세로로
+       쪼개져 다른 칸과 높이가 어긋난다(2026-09-13). 좁은 화면 처리는 아래 @media 에만 둔다. */
+    .actions { display: flex; gap: 6px; align-items: center; }
 
     /* 세션 */
     .session-info { font-size: 12px; color: var(--text3); }
@@ -195,6 +197,14 @@
       .toast { left: 14px; right: 14px; bottom: 14px; }
       .modal-actions { flex-direction: column-reverse; }
       .modal-actions .btn { width: 100%; min-height: 44px; justify-content: center; }
+    }
+
+    /* 사전 명단: 엑셀 단추는 「명단에 올리기」 오른쪽에 붙여 둔다.
+       줄이 좁아지면 아래로 내려가되 왼쪽 기준은 지킨다. */
+    .ed-pre-excel { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--border); }
+    @media (max-width: 900px) {
+      .ed-pre-excel { margin-left: 0; padding-left: 0; border-left: none; width: 100%; }
     }
 
     /* 회원 추가 결과 — 임시 비밀번호는 여기서만 보인다. 눈에 띄어야 받아 적는다. */
@@ -677,15 +687,15 @@
               <input type="number" id="ed-pre-max-devices" value="2" min="1" max="10" style="width:90px;">
             </div>
             <button class="btn btn-primary" id="ed-pre-submit" type="button" onclick="addPreapproved()">명단에 올리기</button>
-          </div>
-          <!-- 여러 명은 엑셀로. 한 줄씩 넣는 위 칸과 같은 곳에 쌓인다. -->
-          <div class="form-row" style="align-items:center; gap:8px; margin-top:4px;">
-            <button class="btn btn-outline btn-small" type="button" onclick="downloadPreapprovedTemplate()">엑셀 양식 받기</button>
-            <label class="btn btn-outline btn-small" style="cursor:pointer;" id="ed-pre-upload-label">
-              엑셀로 여러 명 올리기
-              <input type="file" id="ed-pre-upload" accept=".xlsx,.xls,.csv" style="display:none;">
-            </label>
-            <span id="ed-pre-upload-status" style="font-size:13px;color:var(--text3);"></span>
+            <!-- 여러 명은 엑셀로 — 한 줄씩 넣는 이 칸과 같은 곳에 쌓인다. 그래서 같은 줄에 둔다. -->
+            <span class="ed-pre-excel">
+              <button class="btn btn-outline btn-small" type="button" onclick="downloadPreapprovedTemplate()">엑셀 양식 받기</button>
+              <label class="btn btn-outline btn-small" style="cursor:pointer;" id="ed-pre-upload-label">
+                엑셀로 여러 명
+                <input type="file" id="ed-pre-upload" accept=".xlsx,.xls,.csv" style="display:none;">
+              </label>
+              <span id="ed-pre-upload-status" style="font-size:12.5px;color:var(--text3);"></span>
+            </span>
           </div>
           <div id="ed-pre-upload-preview" class="hidden" style="margin-top:12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -2951,7 +2961,7 @@
           <td>${devList}</td>
           <td class="actions">
             <button class="btn btn-small ${m.status === 'approved' ? 'btn-danger' : 'btn-primary'}" onclick="updateEditorMember('${m.id}', { status: '${m.status === 'approved' ? 'blocked' : 'approved'}' })">${m.status === 'approved' ? '차단' : '승인'}</button>
-            <button class="btn btn-small btn-outline" style="margin-top:3px;" onclick="deleteEditorMember('${m.id}', '${edEsc(m.email)}')">삭제</button>
+            <button class="btn btn-small btn-outline" onclick="deleteEditorMember('${m.id}', '${edEsc(m.email)}')">삭제</button>
           </td>
         </tr>`;
       }).join('');
