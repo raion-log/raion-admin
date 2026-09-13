@@ -678,6 +678,30 @@
             </div>
             <button class="btn btn-primary" id="ed-pre-submit" type="button" onclick="addPreapproved()">명단에 올리기</button>
           </div>
+          <!-- 여러 명은 엑셀로. 한 줄씩 넣는 위 칸과 같은 곳에 쌓인다. -->
+          <div class="form-row" style="align-items:center; gap:8px; margin-top:4px;">
+            <button class="btn btn-outline btn-small" type="button" onclick="downloadPreapprovedTemplate()">엑셀 양식 받기</button>
+            <label class="btn btn-outline btn-small" style="cursor:pointer;" id="ed-pre-upload-label">
+              엑셀로 여러 명 올리기
+              <input type="file" id="ed-pre-upload" accept=".xlsx,.xls,.csv" style="display:none;">
+            </label>
+            <span id="ed-pre-upload-status" style="font-size:13px;color:var(--text3);"></span>
+          </div>
+          <div id="ed-pre-upload-preview" class="hidden" style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <b style="font-size:13px;">올릴 명단 <span id="ed-pre-upload-count">0</span>명</b>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-small btn-primary" type="button" onclick="commitPreapprovedUpload()">이대로 올리기</button>
+                <button class="btn btn-small btn-outline" type="button" onclick="cancelPreapprovedUpload()">취소</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>이메일</th><th>성함</th><th>끝 4자리</th><th>기수</th><th>유형</th><th>기간</th><th>기기</th><th>상태</th></tr></thead>
+                <tbody id="ed-pre-upload-body"></tbody>
+              </table>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>이메일</th><th>성함</th><th>기수</th><th>기간</th><th>올린 날</th><th></th></tr></thead>
@@ -1028,11 +1052,24 @@
       'editor-codes':   () => loadEditorCodes(),
     };
 
+    // 보고 있던 탭을 기억한다 — 새로고침하면 늘 첫 탭(확장프로그램)으로 돌아가 버렸다.
+    // ★localStorage 는 브라우저가 막아 둘 수 있다(시크릿 창·사이트 데이터 차단). 읽기·쓰기를
+    //   모두 감싸고, 못 읽으면 기본 탭으로 조용히 간다.
+    const TAB_KEY = 'raion-admin:tab';
+    const SUBTAB_KEY = 'raion-admin:subtab:';
+    function rememberTab(key, value) {
+      try { localStorage.setItem(key, value); } catch (e) { /* 저장 못 해도 화면은 돈다 */ }
+    }
+    function recallTab(key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+
     function showTab(name) {
       document.querySelectorAll('.tab').forEach(t =>
         t.classList.toggle('active', t.dataset.tab === name));
       document.querySelectorAll('[id^="tab-"]').forEach(panel =>
         panel.classList.toggle('hidden', panel.id !== 'tab-' + name));
+      rememberTab(TAB_KEY, name);
       const load = TAB_LOADERS[name];
       if (load) load();
     }
@@ -1043,8 +1080,27 @@
         t.classList.toggle('active', t.dataset.subtab === name));
       document.querySelectorAll('[id^="sub-' + group + '-"]').forEach(panel =>
         panel.classList.toggle('hidden', panel.id !== 'sub-' + name));
+      rememberTab(SUBTAB_KEY + group, name);
       const load = SUBTAB_LOADERS[name];
       if (load) load();
+    }
+
+    // 마지막에 보던 탭으로 되돌린다. 없거나 사라진 탭이면 지금 켜진 것을 그대로 둔다.
+    function restoreLastTab() {
+      const saved = recallTab(TAB_KEY);
+      const exists = saved && document.querySelector('.tab[data-tab="' + saved + '"]');
+      // 서브탭은 TAB_LOADERS 가 '.subtab.active' 를 보므로, 탭을 열기 **전에** 표시를 맞춰 둔다.
+      for (const group of ['ext', 'editor']) {
+        const sub = recallTab(SUBTAB_KEY + group);
+        if (!sub) continue;
+        const btn = document.querySelector('.subtab[data-subtab="' + sub + '"]');
+        if (!btn) continue;
+        document.querySelectorAll('.subtab[data-group="' + group + '"]').forEach(t =>
+          t.classList.toggle('active', t.dataset.subtab === sub));
+        document.querySelectorAll('[id^="sub-' + group + '-"]').forEach(panel =>
+          panel.classList.toggle('hidden', panel.id !== 'sub-' + sub));
+      }
+      showTab(exists ? saved : (document.querySelector('.tab.active')?.dataset.tab || 'ext'));
     }
 
     document.querySelectorAll('.tab').forEach(tab =>
@@ -1492,6 +1548,25 @@
     });
 
     // Excel 업로드
+    document.getElementById('ed-pre-upload').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      preUploadStatus('파일 읽는 중...');
+      try {
+        const wb = XLSX.read(await file.arrayBuffer());
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        if (!rows.length) { preUploadStatus('시트에 행이 없습니다', 'error'); return; }
+        preUploadRows = rows.map(parsePreapprovedRow);
+        const bad = preUploadRows.filter(r => r.problem).length;
+        preUploadStatus(
+          `${preUploadRows.length - bad}명 올릴 수 있음` + (bad ? `, ${bad}명은 고쳐야 합니다` : ''),
+          bad ? 'error' : 'ok');
+        renderPreUpload();
+      } catch (err) {
+        preUploadStatus(`파일을 읽지 못했습니다: ${err.message}`, 'error');
+      }
+    });
+
     document.getElementById('excel-upload').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2118,7 +2193,7 @@
       document.getElementById('admin-email').textContent = email;
       gateEl.classList.add('hidden');
       document.getElementById('app-root').classList.remove('hidden');
-      showTab('ext');
+      restoreLastTab();   // 늘 '확장프로그램'으로 돌아가지 않고, 보던 탭으로
     }
 
     document.getElementById('gate-login').addEventListener('click', async () => {
@@ -2628,6 +2703,123 @@
       }
     }
 
+    // ── 사전 명단 엑셀 올리기 ────────────────────────────────────
+    // ★한 줄씩 넣는 위 칸과 **같은 곳**에 쌓인다. 올린 사람이 앱에서 가입하는 순간
+    //   서버 트리거가 승인한다 — 업로드가 곧 승인은 아니다.
+    const PRE_UNITS = { '개월': 'months', '월': 'months', '주': 'weeks', '일': 'days',
+                        'months': 'months', 'weeks': 'weeks', 'days': 'days' };
+    let preUploadRows = [];
+
+    function downloadPreapprovedTemplate() {
+      // 기간 단위는 한글 그대로 받는다 — 관리자가 엑셀에서 고쳐 쓰기 쉬워야 한다.
+      const template = [{
+        '이메일': 'example@gmail.com', '성함': '홍길동', '연락처끝4': '1234',
+        '기수': '유유스 1기', '유형': 'student', '이용기간': 3, '기간단위': '개월',
+        '허용기기': 2, '메모': '예시 (이 행은 지우세요)',
+      }];
+      const ws = XLSX.utils.json_to_sheet(template);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '사전승인명단');
+      XLSX.writeFile(wb, 'UV에디터_사전승인명단_양식.xlsx');
+    }
+
+    function preUploadStatus(text, kind) {
+      const el = document.getElementById('ed-pre-upload-status');
+      if (!el) return;
+      el.textContent = text || '';
+      el.style.color = kind === 'error' ? 'var(--red)'
+        : kind === 'ok' ? 'var(--green)' : 'var(--text3)';
+    }
+
+    function parsePreapprovedRow(row) {
+      const pick = (...keys) => {
+        for (const k of keys) {
+          if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+            return String(row[k]).trim();
+          }
+        }
+        return '';
+      };
+      const email = pick('이메일', 'email', 'Email').toLowerCase();
+      const phone = pick('연락처끝4', '연락처 끝 4자리', 'phone_last4').replace(/\D/g, '').slice(-4);
+      const amountRaw = pick('이용기간', '기간', 'valid_amount');
+      const amount = Number(amountRaw) || 3;
+      const unitRaw = pick('기간단위', '단위', 'valid_unit') || '개월';
+      const devices = Number(pick('허용기기', 'max_devices')) || 2;
+      const type = pick('유형', 'member_type') || 'student';
+      const out = {
+        email,
+        name: pick('성함', '이름', 'name') || null,
+        phone_last4: phone || null,
+        cohort: pick('기수', 'cohort') || null,
+        member_type: ['student', 'subscription', 'staff', 'event'].includes(type) ? type : 'student',
+        valid_amount: amount,
+        valid_unit: PRE_UNITS[unitRaw] || 'months',
+        max_devices: devices,
+        memo: pick('메모', 'memo') || null,
+      };
+      // 무엇이 잘못됐는지 행마다 남긴다 — 통째로 거절하면 어디를 고칠지 알 수 없다.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.problem = '이메일 형식';
+      else if (phone && phone.length !== 4) out.problem = '연락처 끝 4자리';
+      else if (!Number.isInteger(amount) || amount < 1 || amount > 120) out.problem = '이용기간 1~120';
+      else if (!Number.isInteger(devices) || devices < 1 || devices > 10) out.problem = '허용기기 1~10';
+      return out;
+    }
+
+    function renderPreUpload() {
+      const body = document.getElementById('ed-pre-upload-body');
+      body.replaceChildren();
+      for (const r of preUploadRows) {
+        const tr = document.createElement('tr');
+        if (r.problem) tr.style.opacity = '0.45';
+        const unitLabel = { months: '개월', weeks: '주', days: '일' }[r.valid_unit];
+        for (const v of [r.email, r.name || '-', r.phone_last4 || '-', r.cohort || '-',
+          r.member_type, `${r.valid_amount}${unitLabel}`, String(r.max_devices)]) {
+          const td = document.createElement('td');
+          td.textContent = v;                 // 사람이 적은 값이다. HTML 로 넣지 않는다
+          tr.appendChild(td);
+        }
+        const st = document.createElement('td');
+        st.textContent = r.problem ? r.problem : 'OK';
+        st.style.color = r.problem ? 'var(--red)' : 'var(--green)';
+        tr.appendChild(st);
+        body.appendChild(tr);
+      }
+      document.getElementById('ed-pre-upload-count').textContent =
+        String(preUploadRows.filter(r => !r.problem).length);
+      document.getElementById('ed-pre-upload-preview').classList.remove('hidden');
+    }
+
+    function cancelPreapprovedUpload() {
+      preUploadRows = [];
+      document.getElementById('ed-pre-upload-preview').classList.add('hidden');
+      document.getElementById('ed-pre-upload').value = '';
+      preUploadStatus('');
+    }
+
+    async function commitPreapprovedUpload() {
+      const rows = preUploadRows.filter(r => !r.problem).map(({ problem, ...rest }) => rest);
+      if (!rows.length) { toast('올릴 수 있는 행이 없습니다', 'error'); return; }
+      if (!confirm(`${rows.length}명을 사전 승인 명단에 올릴까요?\n\n올린 분이 앱에서 가입하는 순간 자동으로 승인됩니다.`)) return;
+
+      // ★한 건씩 보낸다. 통째로 보내면 한 줄(이미 명단에 있는 이메일)이 전부를 되돌린다.
+      let ok = 0; const failed = [];
+      for (const row of rows) {
+        try {
+          await supabasePost('uvengers_editor_preapproved', row);
+          ok++;
+        } catch (e) {
+          const dup = /duplicate|unique/i.test(e.message || '');
+          failed.push(`${row.email}${dup ? ' (이미 명단에 있음)' : ''}`);
+        }
+      }
+      toast(failed.length
+        ? `${ok}명 올렸습니다. ${failed.length}명 실패: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? ' 외' : ''}`
+        : `${ok}명을 명단에 올렸습니다`, failed.length ? 'error' : 'success');
+      cancelPreapprovedUpload();
+      await loadPreapproved();
+    }
+
     async function cancelPreapproved(id, email) {
       if (!confirm(`${email} 을 명단에서 뺄까요?\n이미 가입한 분에게는 영향이 없습니다.`)) return;
       try {
@@ -2732,13 +2924,7 @@
         const vuDate = m.valid_until ? String(m.valid_until).slice(0,10) : '';
         const startDate = m.started_at ? new Date(m.started_at).toLocaleDateString('ko-KR') : '-';
         const typeBadge = edTypeBadge(m) || '<span style="font-size:11px;color:var(--text3);">수강생</span>';
-        let vuNote = '';
-        if (m.valid_until) {
-          const days = Math.ceil((new Date(m.valid_until) - new Date()) / 86400000);
-          if (days < 0) vuNote = '<span style="color:var(--red);font-size:11px;">만료됨</span>';
-          else if (days <= 7) vuNote = `<span style="color:var(--red);font-size:11px;">${days}일 남음</span>`;
-          else vuNote = `<span style="color:var(--text3);font-size:11px;">${days}일 남음</span>`;
-        }
+        // ★남은 날짜는 뱃지 하나로만 말한다. 예전엔 뱃지와 이 줄이 같은 말을 두 번 했다.
         const devs = editorDevices.filter(d => d.member_id === m.id);
         const devList = devs.length ? devs.map(d => {
           const seen = d.last_seen ? new Date(d.last_seen).toLocaleDateString('ko-KR') : '-';
@@ -2755,7 +2941,7 @@
           <td style="font-size:11px;color:var(--text3);">${startDate}</td>
           <td>
             <input type="date" value="${vuDate}" style="${st}" onchange="setEditorValidUntil('${m.id}', this.value)">
-            <span class="badge ${edExpiryInfo(m).cls}" style="font-size:10px;margin-left:4px;">${edExpiryInfo(m).text}</span><br>${vuNote}
+            <span class="badge ${edExpiryInfo(m).cls}" style="font-size:10px;margin-left:4px;">${edExpiryInfo(m).text}</span>
             <div style="display:flex;gap:2px;margin-top:3px;align-items:center;">
               <input type="number" id="ed-ext-dur-${m.id}" value="1" min="1" max="120" aria-label="${edEsc(m.email)} 연장 이용 기간" style="${st}width:38px;text-align:center;">
               <select id="ed-ext-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>

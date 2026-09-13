@@ -101,3 +101,75 @@ test('a member can be deleted outright, not just blocked', () => {
   // A half-finished delete must be reported, never swallowed into a success toast.
   assert.match(source, /case 'account_delete_failed':/);
 });
+
+test('remaining days are shown once, as a badge', () => {
+  // The cell used to print the badge AND a second line saying the same thing.
+  assert.doesNotMatch(source, /vuNote/);
+  assert.match(source, /edExpiryInfo\(m\)\.cls\}"[^>]*>\$\{edExpiryInfo\(m\)\.text\}<\/span>\s*<\/td>|edExpiryInfo\(m\)\.text\}<\/span>\s*\n/);
+});
+
+test('the tab you were on survives a refresh', () => {
+  // It always jumped back to 확장프로그램. Now the tab and its subtab are remembered.
+  assert.match(source, /function restoreLastTab\(\)/);
+  assert.match(source, /rememberTab\(TAB_KEY, name\)/);
+  assert.match(source, /rememberTab\(SUBTAB_KEY \+ group, name\)/);
+  assert.doesNotMatch(source, /\n\s*showTab\('ext'\);/);   // 로그인 직후 고정 호출이 남아 있으면 안 된다
+  assert.match(source, /restoreLastTab\(\);/);
+  // localStorage can throw (private window, blocked site data) — both sides are guarded.
+  assert.match(source, /try \{ localStorage\.setItem/);
+  assert.match(source, /try \{ return localStorage\.getItem/);
+});
+
+test('the pre-approval roster accepts an Excel file', () => {
+  assert.match(source, /id="ed-pre-upload"[^>]*accept="\.xlsx,\.xls,\.csv"/);
+  assert.match(source, /function downloadPreapprovedTemplate\(\)/);
+  assert.match(source, /function parsePreapprovedRow\(row\)/);
+  assert.match(source, /async function commitPreapprovedUpload\(\)/);
+  // Rows go in one at a time: a single duplicate must not roll back the whole file.
+  assert.match(source, /for \(const row of rows\) \{[\s\S]{0,260}supabasePost\('uvengers_editor_preapproved', row\)/);
+  // The preview must render values as text, not HTML.
+  assert.match(source, /td\.textContent = v;/);
+  // Period stays relative to sign-up date, same as the single-entry form.
+  assert.match(source, /valid_amount: amount,\s*\n\s*valid_unit: PRE_UNITS/);
+});
+
+test('Excel rows are parsed the way a real sheet hands them over', () => {
+  // ★Pulling the real function out and running it. Checking that the source merely *contains*
+  //   a function is what let the 「바로 추가」 button sit broken for two days.
+  const units = source.match(/const PRE_UNITS = \{[\s\S]*?\};/)[0];
+  const fn = source.match(/function parsePreapprovedRow\(row\) \{[\s\S]*?\n    \}/)[0];
+  const parse = new Function(`${units}\n${fn}\nreturn parsePreapprovedRow;`)();
+
+  // 한글 머리글 + 한글 단위 — 관리자가 양식을 그대로 채운 경우
+  const a = parse({ '이메일': ' Hong@Gmail.com ', '성함': '홍길동', '연락처끝4': '010-9999',
+                    '기수': '유유스 1기', '유형': 'student', '이용기간': 3, '기간단위': '개월',
+                    '허용기기': 2 });
+  assert.equal(a.problem, undefined);
+  assert.equal(a.email, 'hong@gmail.com', '공백·대문자는 정리한다');
+  assert.equal(a.phone_last4, '9999', '하이픈이 있어도 끝 4자리를 뽑는다');
+  assert.equal(a.valid_unit, 'months');
+  assert.equal(a.valid_amount, 3);
+
+  // 영문 머리글도 받는다
+  const b = parse({ email: 'a@b.com', name: 'Kim', valid_amount: 2, valid_unit: 'weeks' });
+  assert.equal(b.problem, undefined);
+  assert.equal(b.valid_unit, 'weeks');
+  assert.equal(b.valid_amount, 2);
+
+  // 빈 칸은 기본값으로 — 기간을 안 적었다고 거절하지 않는다
+  const c = parse({ '이메일': 'c@d.com' });
+  assert.equal(c.problem, undefined);
+  assert.equal(c.valid_amount, 3);
+  assert.equal(c.valid_unit, 'months');
+  assert.equal(c.max_devices, 2);
+  assert.equal(c.member_type, 'student');
+  assert.equal(c.name, null, '빈 칸은 null 로 — 빈 문자열을 넣으면 트리거가 못 채운다');
+
+  // 잘못된 행은 무엇이 문제인지 말한다(통째로 거절하지 않는다)
+  assert.match(parse({ '이메일': '없음' }).problem, /이메일/);
+  assert.match(parse({ '이메일': 'e@f.com', '이용기간': 999 }).problem, /이용기간/);
+  assert.match(parse({ '이메일': 'e@f.com', '허용기기': 99 }).problem, /허용기기/);
+
+  // 모르는 유형은 조용히 수강생으로 — 서버 check 제약에 걸려 통째로 실패하는 것을 막는다
+  assert.equal(parse({ '이메일': 'g@h.com', '유형': '이상한값' }).member_type, 'student');
+});
