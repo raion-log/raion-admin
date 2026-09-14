@@ -388,27 +388,130 @@
       section.appendChild(cohortList);
       return section;
     }
+    // ★명단의 열쇠는 **기수 + 이름 + 휴대폰 끝 4자리**다 (사용자 2026-09-14).
+    //   Gmail 은 본인이 가입할 때 직접 넣는 것이라 형님이 미리 알 수 없다. 그래서 선택이며,
+    //   비워 두면 서버가 이름+끝 4자리로 맞춘다. 같은 기수에 이름도 끝 4자리도 같은 줄이
+    //   둘 이상이면 자동 승인하지 않고 「가입 승인 대기」로 보낸다.
+    const ROSTER_COLUMNS = ['이름', '휴대폰 끝 4자리', '기수'];
+    function parseRosterRow(row, cohorts) {
+      const pick = (...keys) => {
+        for (const key of keys) {
+          const value = row[key];
+          if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+        }
+        return '';
+      };
+      const name = pick('이름', '성함', 'name').replace(/\s+/g, ' ');
+      // 엑셀이 0402 를 숫자 402 로 저장한다. 전화번호를 통째로 적어도 뒤 4자리만 쓴다.
+      const four = pick('휴대폰 끝 4자리', '끝 4자리', '연락처 끝 4자리', '휴대폰', 'phone')
+        .replace(/[^0-9]/g, '').slice(-4).padStart(4, '0');
+      const cohortText = pick('기수', 'cohort');
+      const digits = cohortText.replace(/[^0-9]/g, '');
+      const cohort = cohorts.find(c => c.name === cohortText)
+        || (digits ? cohorts.find(c => String(c.cohort_number) === digits) : undefined);
+      const problem = !name ? '이름이 비었습니다'
+        : (name.length < 2 || name.length > 40) ? '이름은 2~40자여야 합니다'
+        : !/^[0-9]{4}$/.test(four) ? '휴대폰 끝 4자리가 숫자 4자리가 아닙니다'
+        : !cohortText ? '기수가 비었습니다'
+        : !cohort ? '「' + cohortText + '」 기수를 찾지 못했습니다'
+        : !['draft', 'enrollment', 'active'].includes(cohort.status) ? '「' + cohort.name + '」은 지금 명단을 받지 않습니다'
+        : '';
+      return { display_name: name, phone_last_four: four, cohort_id: cohort ? Number(cohort.id) : null,
+               cohort_name: cohort ? cohort.name : cohortText, problem };
+    }
+    async function bulkRosterAdd(entries, reason) {
+      if (busy) return;
+      if (!reason.value.trim()) { message('등록 사유를 입력해주세요.', true); reason.focus(); return; }
+      if (!global.confirm(entries.length + '명을 수강 명단에 올릴까요?\n변경은 학습실에만 적용됩니다.')) return;
+      busy = true; disabled(true); message(entries.length + '명을 올리는 중입니다. 창을 닫지 마세요.');
+      const token = epoch;
+      const failed = [];
+      let done = 0;
+      try {
+        for (const entry of entries) {
+          const { data, error } = await request('roster_add', {
+            cohort_id: entry.cohort_id, display_name: entry.display_name,
+            gmail_local_id: '', phone_last_four: entry.phone_last_four,
+            source_reference: '', reason: reason.value.trim() });
+          if (token !== epoch) return;
+          if (error || data?.ok !== true) failed.push(entry.display_name); else done += 1;
+        }
+        busy = false;
+        // 한 줄이 실패해도 앞의 줄은 이미 올라갔다 — 몇 명이 됐는지 정확히 말한다.
+        await load(failed.length
+          ? done + '명을 올렸습니다. ' + failed.length + '명은 실패했습니다 (' +
+            failed.slice(0, 5).join(', ') + (failed.length > 5 ? ' 외' : '') + '). 목록을 확인해주세요.'
+          : done + '명을 수강 명단에 올렸습니다.');
+      } catch (error) {
+        if (token === epoch) { message(errorMessage(error), true); disabled(false); status.focus(); }
+      } finally { if (token === epoch) busy = false; }
+    }
     function rosterAdd(cohorts) {
-      const section=el('section',undefined,'academy-roster-add academy-direct-add');
-      section.append(
-        managementHeading('수강생 추가', '이름·Gmail·휴대폰 끝 4자리를 등록하면 가입할 때 같은 정보로 자동 확인합니다.')
-      );
-      const cohort=cohortField(cohorts.filter(row=>['draft','enrollment','active'].includes(row.status)));
-      const name=input('text','수강생 이름'); name.maxLength=40; name.required=true;
-      const gmail=input('text','Gmail 아이디'); gmail.required=true; gmail.maxLength=64; gmail.autocapitalize='none';
-      const phone=input('text','끝 4자리'); phone.inputMode='numeric'; phone.maxLength=4; phone.required=true;
-      const reason=reasonField(); const fields=el('div',undefined,'academy-fields');
-      fields.append(field('기수',cohort),field('이름',name),field('Gmail 아이디 (@gmail.com 고정)',gmail),field('휴대폰 끝 4자리',phone),field('등록 사유',reason));
-      const addAction = button('수강 명단에 추가',()=>{
-        const gmailLocal=gmail.value.trim().toLowerCase();
-        if(!cohort.value) { message('기수를 선택해주세요.',true); cohort.focus(); return; }
-        if(name.value.trim().length<2) { message('수강생 이름을 2자 이상 입력해주세요.',true); name.focus(); return; }
-        if(!/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) { message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요.',true); gmail.focus(); return; }
-        if(!/^[0-9]{4}$/.test(phone.value)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.',true); phone.focus(); return; }
-        return mutate('roster_add',{cohort_id:Number(cohort.value),display_name:name.value.trim(),gmail_local_id:gmailLocal,phone_last_four:phone.value,source_reference:''},reason,`${name.value.trim()} 학생을 ${cohort.selectedOptions[0].textContent} 명단에 추가할까요?`);
-      },'primary');
-      section.append(fields, addAction);
-      section.focusPrimary=()=>cohort.focus();
+      const section = el('section', undefined, 'academy-roster-add academy-direct-add');
+      section.append(managementHeading('수강생 추가',
+        '이름·휴대폰 끝 4자리·기수를 등록하면 그분이 가입할 때 같은 정보로 자동 확인합니다. Gmail 은 본인이 가입할 때 넣습니다.'));
+      const open = cohorts.filter(row => ['draft', 'enrollment', 'active'].includes(row.status));
+      const cohort = cohortField(open);
+      const name = input('text', '수강생 이름'); name.maxLength = 40; name.required = true;
+      const gmail = input('text', '아는 경우에만'); gmail.maxLength = 64; gmail.autocapitalize = 'none';
+      const phone = input('text', '끝 4자리'); phone.inputMode = 'numeric'; phone.maxLength = 4; phone.required = true;
+      const reason = reasonField();
+      const fields = el('div', undefined, 'academy-fields');
+      fields.append(field('기수', cohort), field('이름', name), field('휴대폰 끝 4자리', phone),
+                    field('Gmail 아이디 (선택)', gmail), field('등록 사유', reason));
+      const addAction = button('수강 명단에 추가', () => {
+        const gmailLocal = gmail.value.trim().toLowerCase();
+        if (!cohort.value) { message('기수를 선택해주세요.', true); cohort.focus(); return; }
+        if (name.value.trim().length < 2) { message('수강생 이름을 2자 이상 입력해주세요.', true); name.focus(); return; }
+        if (gmailLocal && !/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) {
+          message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요. 모르면 비워 두세요.', true); gmail.focus(); return; }
+        if (!/^[0-9]{4}$/.test(phone.value)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.', true); phone.focus(); return; }
+        return mutate('roster_add', { cohort_id: Number(cohort.value), display_name: name.value.trim(),
+          gmail_local_id: gmailLocal, phone_last_four: phone.value, source_reference: '' }, reason,
+          name.value.trim() + ' 학생을 ' + cohort.selectedOptions[0].textContent + ' 명단에 추가할까요?');
+      }, 'primary');
+
+      // ── 엑셀로 여러 명. 초록은 되돌릴 수 있는 보조 작업 — UV 에디터 탭과 같은 규칙이다. ──
+      const note = el('p', '', 'academy-bulk-note');
+      const template = button('엑셀 양식 받기', () => {
+        const rows = open.length
+          ? open.slice(0, 3).map(c => ({ '이름': '홍길동', '휴대폰 끝 4자리': '0402', '기수': c.name }))
+          : [{ '이름': '홍길동', '휴대폰 끝 4자리': '0402', '기수': '유유스 1기' }];
+        const sheet = global.XLSX.utils.json_to_sheet(rows, { header: ROSTER_COLUMNS });
+        const book = global.XLSX.utils.book_new();
+        global.XLSX.utils.book_append_sheet(book, sheet, '수강명단');
+        global.XLSX.writeFile(book, '유유스_수강명단_양식.xlsx');
+      }, 'success');
+      const picker = el('input');
+      // 숨기기는 class 로 한다 — 화면 없는 검사에는 style 이 없어 여기서 통째로 터졌다.
+      picker.type = 'file'; picker.accept = '.xlsx,.xls,.csv'; picker.className = 'academy-file-input';
+      picker.setAttribute('aria-label', '수강 명단 엑셀 고르기');
+      const upload = button('엑셀로 여러 명', () => picker.click(), 'success');
+      picker.addEventListener('change', async () => {
+        const file = picker.files && picker.files[0];
+        if (!file) return;
+        try {
+          const book = global.XLSX.read(await file.arrayBuffer());
+          const raw = global.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]]);
+          const parsed = raw.map(row => parseRosterRow(row, cohorts));
+          const good = parsed.filter(row => !row.problem);
+          const bad = parsed.filter(row => row.problem);
+          note.textContent = parsed.length === 0
+            ? '엑셀에서 줄을 읽지 못했습니다. 양식을 받아 그대로 채워주세요.'
+            : parsed.length + '줄 중 ' + good.length + '명 올릴 수 있습니다.' +
+              (bad.length ? ' 건너뛸 ' + bad.length + '줄: ' +
+                bad.slice(0, 3).map(r => (r.display_name || '(이름 없음)') + ' — ' + r.problem).join(' / ') +
+                (bad.length > 3 ? ' 외' : '') : '');
+          if (good.length) await bulkRosterAdd(good, reason);
+        } catch (error) {
+          void error;
+          note.textContent = '엑셀을 읽지 못했습니다. 양식을 받아 그대로 채워주세요.';
+        } finally { picker.value = ''; }
+      });
+      const actions = el('div', undefined, 'academy-add-actions');
+      actions.append(addAction, template, upload, picker);
+      section.append(fields, actions, note);
+      section.focusPrimary = () => cohort.focus();
       return section;
     }
     function rosterManagement(rows, cohorts, total = rows.length, focusDirectAdd, onFilterChange) {
@@ -475,7 +578,8 @@
         const card=el('article',undefined,'academy-record academy-roster-record');
         const rowLayout=el('div',undefined,'academy-roster-row');
         const identity=el('div',undefined,'academy-roster-identity');
-        identity.append(el('h5',row.display_name),el('p',`${row.canonical_gmail} · 휴대폰 끝 ${row.phone_last_four}`));
+        // Gmail 은 본인이 가입할 때 들어온다 — 비어 있으면 「null」이 아니라 그렇게 말한다.
+        identity.append(el('h5',row.display_name),el('p',`${row.canonical_gmail || 'Gmail 은 가입할 때 채워집니다'} · 휴대폰 끝 ${row.phone_last_four}`));
         const rosterState=el('div',undefined,'academy-roster-state');
         rosterState.append(stateBadge(labels[row.status] || row.status,row.status==='bound'),el('span',row.cohort_name));
         identity.appendChild(rosterState);
@@ -483,14 +587,14 @@
         const panels=[];
         if(row.status!=='bound') {
           const editName=input('text'); editName.value=row.display_name; editName.maxLength=40;
-          const editGmail=input('text'); editGmail.value=String(row.canonical_gmail).replace(/@gmail\.com$/,'');
+          const editGmail=input('text'); editGmail.value=String(row.canonical_gmail || '').replace(/@gmail\.com$/,''); editGmail.placeholder='아는 경우에만';
           const editPhone=input('text'); editPhone.value=row.phone_last_four; editPhone.inputMode='numeric'; editPhone.maxLength=4;
           const editReason=reasonField(); const editFields=el('div',undefined,'academy-fields');
-          editFields.append(field('이름',editName),field('Gmail 아이디 (@gmail.com 고정)',editGmail),field('휴대폰 끝 4자리',editPhone),field('수정 사유',editReason));
+          editFields.append(field('이름',editName),field('Gmail 아이디 (선택)',editGmail),field('휴대폰 끝 4자리',editPhone),field('수정 사유',editReason));
           const editPanel=actionPanel(`academy-roster-edit-${row.id}`,'명단 정보 수정',[editFields,button(row.status==='cancelled' ? '수정하고 명단 복구' : '수정 내용 저장',()=>{
             const gmailLocal=editGmail.value.trim().toLowerCase();
             if(editName.value.trim().length<2) { message('수강생 이름을 2자 이상 입력해주세요.',true); editName.focus(); return; }
-            if(!/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) { message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요.',true); editGmail.focus(); return; }
+            if(gmailLocal && !/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) { message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요. 모르면 비워 두세요.',true); editGmail.focus(); return; }
             if(!/^[0-9]{4}$/.test(editPhone.value)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.',true); editPhone.focus(); return; }
             return mutate('roster_update',{roster_entry_id:row.id,revision:row.revision,display_name:editName.value.trim(),gmail_local_id:gmailLocal,phone_last_four:editPhone.value,source_reference:row.source_reference || ''},editReason,`${row.display_name} 학생의 ${row.cohort_name} 명단 정보를 저장할까요?`);
           })]);
@@ -579,8 +683,16 @@
         };
         renderRoster();
         management.append(directAdd, rosterHost);
-        content.append(management, summary(data));
-        content.append(applications(data.applications,data.totals?.applications,data.audit),students(data.students,data.totals?.students,data.audit),cohortManagement(data.cohorts),pagination(data));
+        // ★카드는 **일이 일어나는 순서**로 세운다 (사용자 2026-09-14).
+        //   ① 준비: 기수를 만들고(좌) 그 기수에 명단을 넣는다(우) — 늘 같이 보는 짝이라 2열.
+        //   ② 요약 → ③ 가입 승인 대기(예외만 뜬다) → ④ 수강생 관리(일상) → ⑤ 페이지.
+        //   예전에는 명단 관리가 맨 위, 기수 관리가 맨 아래여서 흐름이 거꾸로였다.
+        const setup = el('div', undefined, 'academy-setup');
+        setup.append(cohortManagement(data.cohorts), management);
+        content.append(setup, summary(data),
+          applications(data.applications, data.totals?.applications, data.audit),
+          students(data.students, data.totals?.students, data.audit),
+          pagination(data));
         root.append(content);
         message(successMessage || '학습실 전용 권한과 최신 정보를 확인했습니다.');
         loaded = true;

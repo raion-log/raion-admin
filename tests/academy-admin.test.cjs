@@ -152,7 +152,9 @@ test('academy work uses one screen without inner tabs and keeps a compact overvi
   assert.equal(findButton(root,'변경 기록'),undefined);
   assert.equal(root.querySelectorAll('button').filter(node=>node.attrs.role==='tab').length,0);
   assert.match(textOf(root),/현재 입장 가능한 기수\s+0개\s+현재 명단\s+0명\s+가입 승인 대기\s+0명\s+등록 수강생\s+0명/);
-  assert.match(textOf(root),/수강 명단 관리.*가입 승인 대기 \(0\).*수강생 관리 \(0\).*기수 관리/);
+  // ★카드는 일이 일어나는 순서다: 준비(기수 관리 + 수강 명단 관리) -> 요약 -> 대기 -> 수강생.
+  //   예전에는 명단 관리가 맨 위, 기수 관리가 맨 아래여서 흐름이 거꾸로였다 (사용자 2026-09-14).
+  assert.match(textOf(root),/기수 관리.*수강 명단 관리.*가입 승인 대기 \(0\).*수강생 관리 \(0\)/);
 });
 test('direct roster entry is the first academy work card and keeps account approval separate',async()=>{
   const calls=[];
@@ -164,14 +166,19 @@ test('direct roster entry is the first academy work card and keeps account appro
   });
   await admin.load();
   const content=root.querySelectorAll('div').find(node=>node.className==='academy-view');
-  assert.match(textOf(content.children[0]),/수강 명단 관리.*수강생 추가.*가입할 때 같은 정보로 자동 확인/);
+  // 준비 두 카드는 좌(기수 관리)·우(수강 명단 관리) 한 묶음이다.
+  const prep=content.children[0];
+  assert.equal(prep.className,'academy-setup');
+  assert.equal(prep.children.length,2);
+  assert.match(textOf(prep.children[0]),/기수 관리/);
+  assert.match(textOf(prep.children[1]),/수강 명단 관리.*수강생 추가.*가입할 때 같은 정보로 자동 확인/);
   assert.match(textOf(content.children[1]),/현재 입장 가능한 기수/);
 
-  const direct=content.children[0];
+  const direct=prep.children[1];
   const select=direct.querySelectorAll('select')[0]; select.value='1'; select.selectedOptions=[{textContent:'유유스 1기'}];
   const inputs=direct.querySelectorAll('input');
   inputs.find(node=>node.placeholder==='수강생 이름').value='테스트 학생';
-  inputs.find(node=>node.placeholder==='Gmail 아이디').value='Test.Student+academy';
+  inputs.find(node=>node.placeholder==='아는 경우에만').value='Test.Student+academy';
   inputs.find(node=>node.placeholder==='끝 4자리').value='1234';
   inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='신청서 대조';
   await findButton(direct,'수강 명단에 추가').events.click();
@@ -183,6 +190,50 @@ test('direct roster entry is the first academy work card and keeps account appro
   const rosterFilter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
   assert.equal(rosterFilter.value,'1');
   assert.doesNotMatch(textOf(direct),/외부 참조|주문\/신청 번호/);
+});
+test('a roster row can be added without a Gmail — name + last four + cohort is the key',async()=>{
+  // ★형님은 수강생의 Gmail 을 미리 알 수 없다. 본인이 가입할 때 넣기 때문이다 (2026-09-14).
+  //   그래서 Gmail 은 선택이고, 비우면 서버가 이름+끝 4자리+기수로 맞춘다.
+  const calls=[];
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    if(args.action==='admin_snapshot') return {data:{...copy,cohorts:[cohort]}};
+    return {data:{ok:true}};
+  });
+  await admin.load();
+  const direct=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-direct-add'));
+  const select=direct.querySelectorAll('select')[0]; select.value='1'; select.selectedOptions=[{textContent:'유유스 1기'}];
+  const inputs=direct.querySelectorAll('input');
+  inputs.find(node=>node.placeholder==='수강생 이름').value='김미가입';
+  inputs.find(node=>node.placeholder==='끝 4자리').value='0402';
+  inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='엑셀 명단 대조';
+  // Gmail 칸은 손대지 않는다.
+  await findButton(direct,'수강 명단에 추가').events.click();
+  const add=calls.find(c=>c.action==='roster_add');
+  assert.ok(add,'Gmail 을 비웠다고 막히면 안 된다');
+  assert.equal(add.payload.gmail_local_id,'');
+  assert.equal(add.payload.display_name,'김미가입');
+  assert.equal(add.payload.phone_last_four,'0402');
+  assert.equal(add.payload.cohort_id,1);
+});
+test('the Excel roster reads name, last four and cohort — and says what it will skip',()=>{
+  // 엑셀이 0402 를 숫자 402 로 저장한다. 전화번호를 통째로 적어도 뒤 4자리만 쓴다.
+  const cohorts=[{id:7,cohort_number:2,name:'유유스 2기',status:'active'},
+                 {id:8,cohort_number:9,name:'유유스 9기',status:'archived'}];
+  assert.match(source,/const ROSTER_COLUMNS = \['이름', '휴대폰 끝 4자리', '기수'\]/);
+  const parse=new Function('cohorts','row',
+    source.slice(source.indexOf('function parseRosterRow'),source.indexOf('async function bulkRosterAdd'))
+    + 'return parseRosterRow(row, cohorts);');
+  const ok=parse(cohorts,{'이름':'홍 길동','휴대폰 끝 4자리':402,'기수':'유유스 2기'});
+  assert.equal(ok.problem,'');
+  assert.equal(ok.phone_last_four,'0402','엑셀이 0 을 떼어먹어도 4자리로 되돌린다');
+  assert.equal(ok.cohort_id,7);
+  assert.equal(parse(cohorts,{'이름':'홍길동','휴대폰':'010-1234-5678','기수':'2기'}).phone_last_four,'5678');
+  assert.equal(parse(cohorts,{'이름':'홍길동','휴대폰 끝 4자리':'0402','기수':'2기'}).cohort_id,7,'「2기」로 적어도 찾는다');
+  assert.match(parse(cohorts,{'이름':'홍길동','휴대폰 끝 4자리':'0402','기수':'유유스 3기'}).problem,/찾지 못했습니다/);
+  assert.match(parse(cohorts,{'이름':'홍길동','휴대폰 끝 4자리':'0402','기수':'유유스 9기'}).problem,/명단을 받지 않습니다/);
+  assert.match(parse(cohorts,{'이름':'','휴대폰 끝 4자리':'0402','기수':'2기'}).problem,/이름이 비었습니다/);
 });
 test('current roster stays prominent while cancelled and internal reference records stay secondary',async()=>{
   const roster=[

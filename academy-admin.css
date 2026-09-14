@@ -117,6 +117,19 @@
 .academy-admin .academy-table .academy-disclosure summary { min-height: 0; padding: 2px 22px 2px 0; }
 .academy-admin .badge-suspended { background: rgba(255, 152, 0, .15); color: #ff9800; }
 
+/* ★준비 단계 두 카드는 늘 같이 본다 — 기수를 만들고 그 기수에 명단을 넣는다.
+   명단 쪽이 넓어야 하므로 1 : 1.45 로 준다 (사용자 2026-09-14). */
+.academy-admin .academy-setup { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 16px; align-items: start; }
+.academy-admin .academy-setup > .academy-card { margin-bottom: 0; }
+.academy-admin .academy-add-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.academy-admin .academy-file-input { display: none; }
+.academy-admin .academy-bulk-note { margin: 8px 0 0; color: var(--text2, #b0b0b0); font-size: 12.5px; }
+
+@media (max-width: 1180px) {
+  .academy-admin .academy-setup { grid-template-columns: minmax(0, 1fr); }
+  .academy-admin .academy-setup > .academy-card { margin-bottom: 16px; }
+}
+
 @media (max-width: 720px) {
   .academy-admin .academy-heading { align-items: stretch; flex-direction: column; }
   .academy-admin .academy-heading .btn { width: fit-content; min-height: 44px; }
