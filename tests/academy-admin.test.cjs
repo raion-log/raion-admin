@@ -82,7 +82,7 @@ test('approval requires an explicit cohort, reason, confirmation and revision; d
   const select=root.querySelectorAll('select').find(node=>node.children.some(option=>String(option.textContent).includes('example@gmail.com')));
   select.value='12';select.selectedOptions=[{textContent:'2기 · 예시 학생 · example@gmail.com'}];
   await approve.events.click(); assert.equal(calls.length,1);
-  const applicationRecord=root.querySelectorAll('article').find(node=>textOf(node).includes('example@gmail.com'));
+  const applicationRecord=root.querySelectorAll('tr').find(node=>textOf(node).includes('example@gmail.com'));
   applicationRecord.querySelectorAll('input').find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='명단 확인';
   const pending=approve.events.click();
   await approve.events.click();
@@ -233,17 +233,21 @@ test('sorting stays inside student management and the page-wide search toolbar i
   assert.match(textOf(studentSection),/수강생 정렬.*이름.*Gmail.*기수.*상태/);
   // ★한 사람은 한 줄이고 칸 순서는 아이디 · 이름 · 끝 4자리 · 기수 · 상태 다 (사용자 2026-09-14).
   //   예전엔 이름만 든 h4 를 읽었다 — 세 줄로 쌓여 있어 그게 가능했다.
-  const lines=()=>studentSection.querySelectorAll('article').map(node=>textOf(node.children[0]).trim().replace(/\s+/g,' '));
-  const 가='alpha@gmail.com 가 학생 끝 1111 유유스 1기 이용 가능';
-  const 나='beta@gmail.com 나 학생 끝 2222 유유스 2기 이용 정지';
+  // ★한 사람은 한 줄이고, 앞 네 칸 순서는 이메일 · 성함 · 끝 4자리 · 기수 다 (사용자 2026-09-14).
+  //   예전엔 카드 + 접기 둘이라 한 사람이 세 덩이였다 — 이름만 든 h4 를 읽는 것이 그래서 가능했다.
+  const rows=()=>studentSection.querySelectorAll('tr').filter(node=>String(node.className)==='academy-row');
+  const lines=()=>rows().map(node=>node.children.slice(0,5).map(c=>textOf(c).trim()).join(' · '));
+  const 가='alpha@gmail.com · 가 학생 · 1111 · 유유스 1기 · 이용 가능';
+  const 나='beta@gmail.com · 나 학생 · 2222 · 유유스 2기 · 이용 정지';
+  assert.deepEqual(studentSection.querySelectorAll('th').map(node=>node.textContent).slice(0,5),
+    ['이메일','성함','끝 4자리','기수','상태']);
   await findButton(studentSection,'이름').events.click();
   assert.deepEqual(lines(),[가,나]);
   await findButton(studentSection,'이름 ↑').events.click();
   assert.deepEqual(lines(),[나,가]);
-  // 한 줄인지는 줄을 만드는 h4 하나뿐인지로 본다 — <p> 가 다시 생기면 또 쌓인다.
-  const first=studentSection.querySelectorAll('article')[0];
-  assert.equal(first.children.filter(c=>c.tagName==='p').length,0,'카드 본문에 <p> 줄을 다시 만들면 안 된다');
-  assert.equal(String(first.children[0].attrs.class||first.children[0].className||''),'academy-record-line');
+  // 한 사람은 <tr> 하나다 — 카드나 접기가 다시 생기면 여기서 걸린다.
+  assert.equal(rows().length,2);
+  assert.equal(studentSection.querySelectorAll('article').length,0,'수강생을 카드로 되돌리면 안 된다');
   assert.doesNotMatch(textOf(root),/선택 승인|선택 정지|일괄 승인/);
 });
 test('roster and cohort management use separate clear cards while cohort access stays explicit',async()=>{
@@ -327,9 +331,11 @@ test('recent audit entries appear only on the related account',async()=>{
   ];
   const {root,admin}=setup(async()=>({data:{...copy,students,audit}}));
   await admin.load();
-  const first=root.querySelectorAll('article').find(node=>textOf(node).includes('studenta@gmail.com'));
-  const second=root.querySelectorAll('article').find(node=>textOf(node).includes('studentb@gmail.com'));
-  assert.match(textOf(first),/계정 관리/);
+  const first=root.querySelectorAll('tr').find(node=>textOf(node).includes('studenta@gmail.com'));
+  const second=root.querySelectorAll('tr').find(node=>textOf(node).includes('studentb@gmail.com'));
+  // 「계정 관리」 접기는 없앴다 — 단추가 그 줄에 바로 선다.
+  assert.match(textOf(first),/이용 정지로 변경/);
+  assert.doesNotMatch(textOf(first),/계정 관리/);
   assert.match(textOf(first),/최근 이력\s+2건.*이용 상태 변경.*이용 재개.*명단 자동 확인/);
   assert.doesNotMatch(textOf(first),/2기 배정/);
   assert.match(textOf(second),/현재 기수 변경.*2기 배정/);

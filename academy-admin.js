@@ -109,22 +109,38 @@
     function command(action, row, values, reason, confirmation) {
       return mutate(action, { user_id: row.user_id, revision: row.revision, ...values }, reason, confirmation);
     }
-    // ★한 사람은 **한 줄**이다. 예전엔 이름 / Gmail·휴대폰 / 상태·기수 를 세 줄로 쌓아
-    //   수강생 한 명이 화면 세 줄을 먹었고, 기수가 맨 아랫줄에 섞여 훑어보기가 안 됐다
-    //   (사용자 2026-09-14). 순서는 에디터 회원 표와 같게 맞춘다 —
-    //   아이디(Gmail) · 이름 · 휴대폰 끝 4자리 · 기수.
-    function record(row, headingTag = 'h4', extras = []) {
-      const section = el('article', undefined, 'academy-record');
-      const line = el(headingTag, undefined, 'academy-record-line');
-      line.append(
-        el('span', row.canonical_gmail, 'academy-record-id'),
-        el('span', row.display_name, 'academy-record-name'),
-        el('span', `끝 ${row.phone_last_four}`, 'academy-record-phone'),
-        el('span', row.cohort_name || '기수 없음', 'academy-record-cohort'),
-        ...extras
+    // ★한 사람은 **한 줄**이다 — 다른 탭들처럼 표로 세운다 (사용자 2026-09-14).
+    //   예전엔 카드 + 「계정 관리」·「최근 이력」 접기라 한 사람이 화면 세 덩이를 먹었고,
+    //   기수는 맨 아랫줄에 섞여 훑어보기가 안 됐다.
+    //   앞 네 칸은 어느 표에서나 같은 순서다: 이메일 · 성함 · 끝 4자리 · 기수.
+    const PERSON_HEAD = ['이메일', '성함', '끝 4자리', '기수'];
+    function personTable(headers) {
+      // 폭이 모자라면 줄을 늘리지 말고 가로로 민다 — 다른 탭의 .table-scroll 과 같은 규칙.
+      const scroll = el('div', undefined, 'table-scroll academy-table-scroll');
+      scroll.setAttribute('tabindex', '0');
+      const table = el('table', undefined, 'academy-table');
+      const head = el('thead'), headRow = el('tr');
+      for (const label of [...PERSON_HEAD, ...headers]) headRow.appendChild(el('th', label));
+      head.appendChild(headRow);
+      const body = el('tbody');
+      table.append(head, body);
+      scroll.appendChild(table);
+      return { scroll, body };
+    }
+    function personRow(row) {
+      const tr = el('tr', undefined, 'academy-row');
+      tr.append(
+        el('td', row.canonical_gmail, 'academy-cell-id'),
+        el('td', row.display_name),
+        el('td', row.phone_last_four, 'academy-cell-four'),
+        el('td', row.cohort_name || '없음', 'academy-cell-cohort')
       );
-      section.append(line);
-      return section;
+      return tr;
+    }
+    function cell(...nodes) {
+      const td = el('td');
+      td.append(...nodes);
+      return td;
     }
     function disclosure(label, children, meta) {
       const details = el('details', undefined, 'academy-disclosure');
@@ -174,29 +190,32 @@
     function applications(rows, total = rows.length, audit = [], filtered = false) {
       const count = filtered ? `${rows.length} 표시 / 전체 ${total}` : total;
       const section = el('section', undefined, 'academy-card'); section.appendChild(el('h3', `가입 승인 대기 (${count})`));
-      if (!rows.length) section.appendChild(el('p', '승인 대기 신청이 없습니다.', 'empty'));
+      if (!rows.length) { section.appendChild(el('p', '승인 대기 신청이 없습니다.', 'empty')); return section; }
+      const { scroll, body } = personTable(['일치 명단', '검토 사유', '관리', '최근 이력']);
       for (const row of rows) {
-        const card = record(row), matches = Array.isArray(row.roster_matches) ? row.roster_matches : [], rosterSelect = rosterField(matches), reason = reasonField();
-        const fields = el('div', undefined, 'academy-fields');
-        fields.append(field('이름·Gmail·끝 4자리가 모두 같은 수강 명단', rosterSelect), field('검토 사유', reason));
-        const review = [];
-        if (!matches.length) review.push(el('p', '먼저 기수·명단에서 이 학생을 정확히 등록해주세요.', 'academy-notice'));
-        const actions = el('div', undefined, 'academy-actions');
+        const matches = Array.isArray(row.roster_matches) ? row.roster_matches : [], rosterSelect = rosterField(matches), reason = reasonField();
+        // 표에는 라벨을 띄울 자리가 없다 — 머리글이 그 몫을 하고, 읽어 주는 이름만 따로 단다.
+        rosterSelect.setAttribute('aria-label', `${row.display_name} 이름·Gmail·끝 4자리가 모두 같은 수강 명단`);
+        reason.setAttribute('aria-label', `${row.display_name} 검토 사유`);
+        const rosterCell = cell(rosterSelect);
+        if (!matches.length) rosterCell.appendChild(el('p', '먼저 기수·명단에서 이 학생을 정확히 등록해주세요.', 'academy-notice'));
+        const actions = el('div', undefined, 'actions');
         actions.append(button('승인하고 기수 배정', () => {
           if (!rosterSelect.value) { message('이름·Gmail·끝 4자리가 모두 같은 수강 명단을 선택해주세요.', true); rosterSelect.focus(); return; }
           const name = rosterSelect.selectedOptions[0].textContent;
           return command('review', row, { decision: 'approve', roster_entry_id: Number(rosterSelect.value) }, reason, `${name} 명단과 신청을 묶어 승인할까요?`);
         }, 'primary'), button('신청 반려', () => command('review', row, { decision: 'reject' }, reason, `${row.display_name} 학생의 신청을 반려할까요?`), 'danger'));
-        review.push(fields, actions);
-        card.append(disclosure('가입 신청 검토', review), historyDisclosure(row.user_id, audit));
-        section.appendChild(card);
+        const tr = personRow(row);
+        tr.append(rosterCell, cell(reason), cell(actions), cell(historyDisclosure(row.user_id, audit)));
+        body.appendChild(tr);
       }
+      section.appendChild(scroll);
       return section;
     }
     function students(rows, total = rows.length, audit = []) {
       const section = el('section', undefined, 'academy-card'); section.appendChild(el('h3', `수강생 관리 (${total})`));
       const statuses = { active: '이용 가능', suspended: '이용 정지', revoked: '이용 해지' };
-      const list = el('div', undefined, 'academy-student-list');
+      const { scroll, body } = personTable(['상태', '기수 변경', '변경 사유', '관리', '최근 이력']);
       let sortField = '';
       let sortDirection = 'asc';
       const sortModes = [['name', '이름'], ['email', 'Gmail'], ['cohort', '기수'], ['status', '상태']];
@@ -211,25 +230,29 @@
           const result = String(sortValue(a, sortField)).toLowerCase().localeCompare(String(sortValue(b, sortField)).toLowerCase(), 'ko', { numeric: true });
           return sortDirection === 'asc' ? result : -result;
         }) : rows;
-        list.replaceChildren();
+        body.replaceChildren();
         for (const row of visible) {
           const candidates = Array.isArray(row.roster_options) ? row.roster_options : [];
-          // 상태도 같은 줄에 붙인다 — 기수는 record 가 이미 그 줄에 넣는다.
-          const statusChip = el('span', statuses[row.status] || '운영 확인 필요', 'academy-record-status');
-          const card = record(row, 'h4', [statusChip]), rosterSelect = rosterField(candidates), reason = reasonField();
-          const fields = el('div', undefined, 'academy-fields');
-          fields.append(field('현재 기수로 사용할 등록 명단', rosterSelect), field('변경 사유', reason));
-          const actions = el('div', undefined, 'academy-actions');
-          actions.append(button('현재 기수 변경', () => {
+          const rosterSelect = rosterField(candidates), reason = reasonField();
+          rosterSelect.setAttribute('aria-label', `${row.display_name} 현재 기수로 사용할 등록 명단`);
+          reason.setAttribute('aria-label', `${row.display_name} 변경 사유`);
+          const assign = el('div', undefined, 'actions');
+          assign.append(rosterSelect, button('현재 기수 변경', () => {
             if (!rosterSelect.value) { message('이 학생과 일치하는 기수 명단을 선택해주세요.', true); rosterSelect.focus(); return; }
             return command('assign', row, { roster_entry_id: Number(rosterSelect.value) }, reason, `${row.display_name} 학생의 현재 기수를 ${rosterSelect.selectedOptions[0].textContent}(으)로 바꿀까요?`);
           }, 'primary'));
+          const actions = el('div', undefined, 'actions');
           for (const [value, label] of Object.entries(statuses)) {
             if (row.status === value) continue;
             actions.appendChild(button(label + '로 변경', () => command('set_status', row, { status: value }, reason, `${row.display_name} 학생을 ${label} 상태로 바꿀까요?`), value === 'active' ? 'primary' : value === 'revoked' ? 'danger' : 'outline'));
           }
-          card.append(disclosure('계정 관리', [fields, actions]), historyDisclosure(row.user_id, audit));
-          list.appendChild(card);
+          const tr = personRow(row);
+          tr.append(
+            cell(el('span', statuses[row.status] || '운영 확인 필요', `badge badge-${row.status}`)),
+            cell(assign), cell(reason), cell(actions),
+            cell(historyDisclosure(row.user_id, audit))
+          );
+          body.appendChild(tr);
         }
       };
       if (!rows.length) {
@@ -260,7 +283,7 @@
         section.appendChild(controls);
       }
       renderRows();
-      section.appendChild(list);
+      section.appendChild(scroll);
       return section;
     }
     function input(type, placeholder) {
