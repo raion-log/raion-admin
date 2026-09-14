@@ -133,14 +133,33 @@ test('the device cell folds to one line and a cleared date is not shown as harml
 });
 
 test('the Excel template example row is never uploaded as a real pre-approval', () => {
-  // Forgetting to delete it pre-approved example@gmail.com — whoever owns that address would be auto-approved.
-  const start = source.indexOf('function parsePreapprovedRow(row)');
-  const end = source.indexOf('function renderPreUpload()');
-  const PRE_UNITS = { '개월': 'months', '월': 'months', '주': 'weeks', '일': 'days' };
-  const parse = new Function('PRE_UNITS', source.slice(start, end) + 'return parsePreapprovedRow;')(PRE_UNITS);
-  assert.match(parse({ '이메일': 'example@gmail.com', '성함': '홍길동', '메모': '예시 (이 행은 지우세요)' }).problem, /예시 줄/);
-  assert.match(parse({ '이메일': 'real@gmail.com', '메모': '예시 (이 행은 지우세요)' }).problem, /예시 줄/);
-  assert.equal(parse({ '이메일': 'real@gmail.com', '성함': '김철수', '메모': '예시 강의 수강' }).problem, undefined);
+  // Forgetting to delete it pre-approved 「홍길동 · 1234」 — whoever signs up with that name and last four
+  // would be auto-approved.
+  const units = source.match(/const PRE_UNITS = \{[\s\S]*?\};/)[0];
+  const types = source.match(/const ED_TYPE_LABEL = \{[\s\S]*?\};\s*const ED_TYPE_CODE = \{[\s\S]*?\};/)[0];
+  const fn = source.match(/function parsePreapprovedRow\(row\) \{[\s\S]*?\n    \}/)[0];
+  const parse = new Function(`${units}\n${types}\n${fn}\nreturn parsePreapprovedRow;`)();
+  assert.match(parse({ '성함': '홍길동', '연락처끝4': '1234', '메모': '예시 (이 행은 지우세요)' }).problem, /예시 줄/);
+  assert.match(parse({ '성함': '홍길동', '연락처끝4': '1234' }).problem, /예시 줄/, '메모를 지워도 예시 값 그대로면 막는다');
+  assert.equal(parse({ '성함': '김철수', '연락처끝4': '5678', '메모': '예시 강의 수강' }).problem, undefined);
+  // The template itself carries no e-mail column and shows the type in Korean.
+  const template = source.slice(source.indexOf('function downloadPreapprovedTemplate()'), source.indexOf('function preUploadStatus('));
+  assert.doesNotMatch(template, /'이메일'/);
+  assert.match(template, /'유형': '수강생'/);
+});
+
+test('the pre-approval form takes no e-mail and the lists never show the English type', () => {
+  const card = source.slice(source.indexOf('<!-- 가입 전 미리 승인 -->'), source.indexOf('id="ed-pre-tbody"'));
+  assert.doesNotMatch(card, /id="ed-pre-email"/, '이메일 칸이 없어야 한다');
+  assert.match(card, /<label for="ed-pre-name">성함 \(필수\)<\/label>/);
+  assert.match(card, /<label for="ed-pre-phone">연락처 끝 4자리 \(필수\)<\/label>/);
+  assert.match(card, /<thead><tr><th>성함<\/th><th>끝 4자리<\/th><th>기수<\/th><th>유형<\/th>/);
+  const add = source.slice(source.indexOf('async function addPreapproved()'), source.indexOf('// ── 사전 명단 엑셀 올리기'));
+  assert.doesNotMatch(add, /email/, 'addPreapproved 는 이메일을 보내지 않는다');
+  assert.match(add, /if \(!\/\^\[0-9\]\{4\}\$\/\.test\(phone\)\)/);
+  // 미리보기와 CSV 는 영문 유형을 그대로 찍지 않는다
+  assert.match(source, /ED_TYPE_LABEL\[r\.member_type\] \|\| r\.member_type/);
+  assert.match(source, /c === 'member_type' \? \(ED_TYPE_LABEL\[r\[c\]\] \|\| r\[c\]\)/);
 });
 
 test('remaining days are shown once, as a badge', () => {
@@ -178,41 +197,48 @@ test('Excel rows are parsed the way a real sheet hands them over', () => {
   // ★Pulling the real function out and running it. Checking that the source merely *contains*
   //   a function is what let the 「바로 추가」 button sit broken for two days.
   const units = source.match(/const PRE_UNITS = \{[\s\S]*?\};/)[0];
+  const types = source.match(/const ED_TYPE_LABEL = \{[\s\S]*?\};\s*const ED_TYPE_CODE = \{[\s\S]*?\};/)[0];
   const fn = source.match(/function parsePreapprovedRow\(row\) \{[\s\S]*?\n    \}/)[0];
-  const parse = new Function(`${units}\n${fn}\nreturn parsePreapprovedRow;`)();
+  const parse = new Function(`${units}\n${types}\n${fn}\nreturn parsePreapprovedRow;`)();
 
-  // 한글 머리글 + 한글 단위 — 관리자가 양식을 그대로 채운 경우
-  const a = parse({ '이메일': ' Hong@Gmail.com ', '성함': '홍길동', '연락처끝4': '010-9999',
-                    '기수': '유유스 1기', '유형': 'student', '이용기간': 3, '기간단위': '개월',
-                    '허용기기': 2 });
+  // ★이메일은 받지도 읽지도 않는다 — 수강생이 어떤 이메일로 가입할지 모른다 (사용자 2026-09-14).
+  //   열쇠는 성함 + 연락처 끝 4자리다.
+  const a = parse({ '이메일': 'Hong@Gmail.com', '성함': ' 홍  길동 ', '연락처끝4': '010-9999',
+                    '기수': '유유스 1기', '유형': '수강생', '이용기간': 3, '기간단위': '개월', '허용기기': 2 });
   assert.equal(a.problem, undefined);
-  assert.equal(a.email, 'hong@gmail.com', '공백·대문자는 정리한다');
+  assert.equal('email' in a, false, '이메일은 서버로 보내지 않는다');
+  assert.equal(a.name, '홍 길동', '앞뒤·겹친 공백은 정리한다');
   assert.equal(a.phone_last4, '9999', '하이픈이 있어도 끝 4자리를 뽑는다');
+  assert.equal(a.member_type, 'student', '한글 유형을 서버 값으로 바꾼다');
   assert.equal(a.valid_unit, 'months');
   assert.equal(a.valid_amount, 3);
 
-  // 영문 머리글도 받는다
-  const b = parse({ email: 'a@b.com', name: 'Kim', valid_amount: 2, valid_unit: 'weeks' });
-  assert.equal(b.problem, undefined);
-  assert.equal(b.valid_unit, 'weeks');
-  assert.equal(b.valid_amount, 2);
+  // 엑셀이 0402 를 숫자 402 로 저장한다 — 4자리로 되돌린다
+  assert.equal(parse({ '성함': '김영희', '연락처끝4': 402 }).phone_last4, '0402');
 
-  // 빈 칸은 기본값으로 — 기간을 안 적었다고 거절하지 않는다
-  const c = parse({ '이메일': 'c@d.com' });
+  // 영문 머리글·영문 유형(예전 양식)도 받는다
+  const b = parse({ name: 'Kim Lee', phone_last4: '1111', member_type: 'subscription', valid_amount: 2, valid_unit: 'weeks' });
+  assert.equal(b.problem, undefined);
+  assert.equal(b.member_type, 'subscription');
+  assert.equal(b.valid_unit, 'weeks');
+
+  // 빈 칸은 기본값으로 — 기간·유형을 안 적었다고 거절하지 않는다
+  const c = parse({ '성함': '박민지', '연락처끝4': '2222' });
   assert.equal(c.problem, undefined);
   assert.equal(c.valid_amount, 3);
   assert.equal(c.valid_unit, 'months');
   assert.equal(c.max_devices, 2);
   assert.equal(c.member_type, 'student');
-  assert.equal(c.name, null, '빈 칸은 null 로 — 빈 문자열을 넣으면 트리거가 못 채운다');
+  assert.equal(c.cohort, null);
 
-  // 잘못된 행은 무엇이 문제인지 말한다(통째로 거절하지 않는다)
-  assert.match(parse({ '이메일': '없음' }).problem, /이메일/);
-  assert.match(parse({ '이메일': 'e@f.com', '이용기간': 999 }).problem, /이용기간/);
-  assert.match(parse({ '이메일': 'e@f.com', '허용기기': 99 }).problem, /허용기기/);
-
-  // 모르는 유형은 조용히 수강생으로 — 서버 check 제약에 걸려 통째로 실패하는 것을 막는다
-  assert.equal(parse({ '이메일': 'g@h.com', '유형': '이상한값' }).member_type, 'student');
+  // 잘못된 행은 무엇이 문제인지 말한다(통째로 거절하지 않는다). 열쇠가 비면 올리지 않는다.
+  assert.match(parse({ '연락처끝4': '1234' }).problem, /성함/);
+  assert.match(parse({ '성함': '최지우' }).problem, /연락처 끝 4자리/);
+  assert.match(parse({ '성함': '최지우', '연락처끝4': '12' }).problem, /연락처 끝 4자리/);
+  assert.match(parse({ '성함': '최지우', '연락처끝4': '1234', '이용기간': 999 }).problem, /이용기간/);
+  assert.match(parse({ '성함': '최지우', '연락처끝4': '1234', '허용기기': 99 }).problem, /허용기기/);
+  // 모르는 유형은 조용히 넘기지 않고 말한다 — 수강생으로 몰래 바꾸면 구독 회원이 수강생이 된다
+  assert.match(parse({ '성함': '최지우', '연락처끝4': '1234', '유형': '이상한값' }).problem, /유형은 수강생·구독·내부·이벤트/);
 });
 
 test('row action buttons sit on one line, at the same height as the rest of the row', () => {

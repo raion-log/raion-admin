@@ -678,19 +678,17 @@
         <!-- 가입 전 미리 승인 -->
         <div class="card">
           <h3>가입 전 미리 승인 (<span id="ed-pre-count">0</span>)</h3>
-          <p class="form-help">아직 가입하지 않은 분을 미리 올려둡니다. 그분이 앱에서 가입하는 순간 자동으로 승인되고 이용 기간이 들어갑니다 — 따로 승인 버튼을 누르지 않아도 됩니다. 계정과 비밀번호는 본인이 직접 만듭니다.</p>
+          <!-- ★이메일로 맞추지 않는다 — 수강생이 어떤 이메일로 가입할지 미리 알 수 없다 (사용자 2026-09-14).
+               성함 + 연락처 끝 4자리가 같은 분이 가입하면 자동 승인된다. -->
+          <p class="form-help">아직 가입하지 않은 분을 미리 올려둡니다. <b>성함과 연락처 끝 4자리가 같은 분</b>이 앱에서 가입하는 순간 자동으로 승인되고 이용 기간이 들어갑니다 — 이메일은 몰라도 됩니다. 계정과 비밀번호는 본인이 직접 만듭니다.</p>
           <div class="form-row">
             <div class="form-group flex-1">
-              <label for="ed-pre-email">이메일</label>
-              <input type="email" id="ed-pre-email" placeholder="user@gmail.com" autocomplete="off" required>
-            </div>
-            <div class="form-group flex-1">
-              <label for="ed-pre-name">성함</label>
-              <input type="text" id="ed-pre-name" placeholder="홍길동" maxlength="40" autocomplete="off">
+              <label for="ed-pre-name">성함 (필수)</label>
+              <input type="text" id="ed-pre-name" placeholder="홍길동" maxlength="40" autocomplete="off" required>
             </div>
             <div class="form-group">
-              <label for="ed-pre-phone">연락처 끝 4자리</label>
-              <input type="text" id="ed-pre-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off">
+              <label for="ed-pre-phone">연락처 끝 4자리 (필수)</label>
+              <input type="text" id="ed-pre-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off" required>
             </div>
             <div class="form-group">
               <label for="ed-pre-cohort">기수</label>
@@ -738,14 +736,14 @@
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>이메일</th><th>성함</th><th>끝 4자리</th><th>기수</th><th>유형</th><th>기간</th><th>기기</th><th>상태</th></tr></thead>
+                <thead><tr><th>성함</th><th>끝 4자리</th><th>기수</th><th>유형</th><th>기간</th><th>기기</th><th>상태</th></tr></thead>
                 <tbody id="ed-pre-upload-body"></tbody>
               </table>
             </div>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>이메일</th><th>성함</th><th>기수</th><th>기간</th><th>올린 날</th><th></th></tr></thead>
+              <thead><tr><th>성함</th><th>끝 4자리</th><th>기수</th><th>기간</th><th>올린 날</th><th></th></tr></thead>
               <tbody id="ed-pre-tbody"><tr><td colspan="6" class="empty">불러오는 중…</td></tr></tbody>
             </table>
           </div>
@@ -2612,9 +2610,15 @@
     function edExportCsv(kind) {
       const rows = edRowsOf(kind);
       if (!rows.length) { toast('내보낼 행이 없습니다', 'error'); return; }
-      const cols = ['email','name','phone_last4','cohort','member_type','status','started_at','valid_until','max_devices'];
+      // \uBA38\uB9AC\uAE00\u00B7\uC720\uD615\u00B7\uC0C1\uD0DC\uB294 \uD55C\uAE00\uB85C \uB0B4\uBCF4\uB0B8\uB2E4 \u2014 \uC5D1\uC140\uB85C \uC5EC\uB294 \uC0AC\uB78C\uC774 \uBCF4\uB294 \uD45C\uB2E4(\u300Cstudent \uB9D0\uACE0 \uC218\uAC15\uC0DD\u300D).
+      const cols = [['email','\uC774\uBA54\uC77C'],['name','\uC131\uD568'],['phone_last4','\uC5F0\uB77D\uCC98\uB05D4'],['cohort','\uAE30\uC218'],
+        ['member_type','\uC720\uD615'],['status','\uC0C1\uD0DC'],['started_at','\uC2DC\uC791\uC77C'],['valid_until','\uC720\uD6A8\uAE30\uAC04'],['max_devices','\uD5C8\uC6A9\uAE30\uAE30']];
+      const STATUS_LABEL = { approved: '\uC2B9\uC778', pending: '\uB300\uAE30', blocked: '\uCC28\uB2E8' };
+      const shown = (r, c) => c === 'member_type' ? (ED_TYPE_LABEL[r[c]] || r[c])
+        : c === 'status' ? (STATUS_LABEL[r[c]] || r[c]) : r[c];
       const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
-      const csv = '\uFEFF' + [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\n');
+      const csv = '\uFEFF' + [cols.map(([, label]) => label).join(','),
+        ...rows.map(r => cols.map(([c]) => esc(shown(r, c))).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
       a.download = `uv-editor-${kind}-${new Date().toISOString().slice(0,10)}.csv`;
@@ -2680,10 +2684,10 @@
         tbody.appendChild(edPreEmptyRow('아직 올려둔 명단이 없습니다'));
         return;
       }
-      // ★원문을 HTML 로 넣지 않는다 — 이름·이메일은 사람이 적은 값이다.
+      // ★원문을 HTML 로 넣지 않는다 — 성함은 사람이 적은 값이다.
       for (const p of editorPreapproved) {
         const tr = document.createElement('tr');
-        for (const value of [p.email, p.name || '-', p.cohort || '-', edPrePeriodLabel(p),
+        for (const value of [p.name || '-', p.phone_last4 || '-', p.cohort || '-', edPrePeriodLabel(p),
           new Date(p.created_at).toLocaleDateString('ko-KR')]) {
           const td = document.createElement('td');
           td.textContent = value;
@@ -2694,18 +2698,23 @@
         cancel.type = 'button';
         cancel.className = 'btn btn-small btn-outline';
         cancel.textContent = '취소';
-        cancel.addEventListener('click', () => cancelPreapproved(p.id, p.email));
+        cancel.addEventListener('click', () => cancelPreapproved(p.id, edPreWho(p)));
         actions.appendChild(cancel);
         tr.appendChild(actions);
         tbody.appendChild(tr);
       }
     }
 
+    // 명단 한 줄을 사람 말로 — 이메일이 없으니 성함과 끝 4자리로 부른다.
+    function edPreWho(p) {
+      return `${p.name || '(성함 없음)'}${p.phone_last4 ? ` (끝 ${p.phone_last4})` : ''}`;
+    }
+
     async function addPreapproved() {
-      const emailInput = document.getElementById('ed-pre-email');
-      const email = emailInput.value.trim().toLowerCase();
-      const name = document.getElementById('ed-pre-name').value.trim();
-      const phone = document.getElementById('ed-pre-phone').value.trim();
+      const nameInput = document.getElementById('ed-pre-name');
+      const phoneInput = document.getElementById('ed-pre-phone');
+      const name = nameInput.value.trim().replace(/\s+/g, ' ');
+      const phone = phoneInput.value.trim();
       const cohort = document.getElementById('ed-pre-cohort').value || null;
       const memberType = document.getElementById('ed-pre-type').value;
       const amount = Number(document.getElementById('ed-pre-duration').value);
@@ -2713,11 +2722,10 @@
       const maxDevices = Number(document.getElementById('ed-pre-max-devices').value);
       const submit = document.getElementById('ed-pre-submit');
 
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        toast('올바른 이메일을 입력해주세요', 'error'); emailInput.focus(); return;
-      }
-      if (phone && !/^[0-9]{4}$/.test(phone)) {
-        toast('연락처는 끝 4자리 숫자만 입력해주세요', 'error'); return;
+      // ★성함과 끝 4자리가 **맞추는 열쇠**라 둘 다 있어야 한다. 이메일은 받지 않는다.
+      if (name.length < 2) { toast('성함을 2자 이상 입력해주세요', 'error'); nameInput.focus(); return; }
+      if (!/^[0-9]{4}$/.test(phone)) {
+        toast('연락처 끝 4자리를 숫자로 입력해주세요', 'error'); phoneInput.focus(); return;
       }
       if (!Number.isInteger(amount) || amount < 1 || amount > 120) {
         toast('이용 기간은 1~120 사이로 입력해주세요', 'error'); return;
@@ -2731,20 +2739,19 @@
         // ★기간은 날짜로 고정하지 않고 '가입일부터 N개월'로 넣는다. 지금 날짜로 굳히면
         //   명단에 올린 뒤 한 달 지나 가입한 사람은 기간을 거의 못 쓴다.
         await supabasePost('uvengers_editor_preapproved', {
-          email, name: name || null, phone_last4: phone || null, cohort,
+          name, phone_last4: phone, cohort,
           member_type: memberType, valid_amount: amount, valid_unit: unit,
           max_devices: maxDevices
         });
-        toast('명단에 올렸습니다. 본인이 가입하면 자동 승인됩니다', 'success');
-        emailInput.value = '';
-        document.getElementById('ed-pre-name').value = '';
-        document.getElementById('ed-pre-phone').value = '';
+        toast('명단에 올렸습니다. 같은 성함·끝 4자리로 가입하면 자동 승인됩니다', 'success');
+        nameInput.value = '';
+        phoneInput.value = '';
         await loadPreapproved();
-        emailInput.focus();
+        nameInput.focus();
       } catch (error) {
         const duplicate = /duplicate|unique/i.test(error.message || '');
         toast(duplicate
-          ? '이미 명단에 있는 이메일입니다'
+          ? '같은 성함·끝 4자리가 이미 명단에 있습니다'
           : `명단에 올리지 못했습니다 — ${error.message || '원인 미상'}`, 'error');
       } finally {
         submit.disabled = false;
@@ -2756,13 +2763,19 @@
     //   서버 트리거가 승인한다 — 업로드가 곧 승인은 아니다.
     const PRE_UNITS = { '개월': 'months', '월': 'months', '주': 'weeks', '일': 'days',
                         'months': 'months', 'weeks': 'weeks', 'days': 'days' };
+    // ★유형은 화면·엑셀 모두 **한글**로 보인다(사용자 2026-09-14: 「student 말고 수강생」).
+    //   서버에는 영문 값이 들어가므로 여기서만 바꿔 준다. 예전 양식의 영문도 받는다.
+    const ED_TYPE_LABEL = { student: '수강생', subscription: '구독', staff: '내부', event: '이벤트' };
+    const ED_TYPE_CODE = { '수강생': 'student', '구독': 'subscription', '내부': 'staff', '이벤트': 'event',
+                           student: 'student', subscription: 'subscription', staff: 'staff', event: 'event' };
     let preUploadRows = [];
 
     function downloadPreapprovedTemplate() {
       // 기간 단위는 한글 그대로 받는다 — 관리자가 엑셀에서 고쳐 쓰기 쉬워야 한다.
+      // 이메일 칸은 없다 — 성함 + 연락처 끝 4자리로 맞춘다. 유형은 한글.
       const template = [{
-        '이메일': 'example@gmail.com', '성함': '홍길동', '연락처끝4': '1234',
-        '기수': '유유스 1기', '유형': 'student', '이용기간': 3, '기간단위': '개월',
+        '성함': '홍길동', '연락처끝4': '1234',
+        '기수': '유유스 1기', '유형': '수강생', '이용기간': 3, '기간단위': '개월',
         '허용기기': 2, '메모': '예시 (이 행은 지우세요)',
       }];
       const ws = XLSX.utils.json_to_sheet(template);
@@ -2788,30 +2801,38 @@
         }
         return '';
       };
-      const email = pick('이메일', 'email', 'Email').toLowerCase();
-      const phone = pick('연락처끝4', '연락처 끝 4자리', 'phone_last4').replace(/\D/g, '').slice(-4);
+      // ★이메일 칸은 읽지 않는다 — 성함 + 연락처 끝 4자리가 열쇠다 (사용자 2026-09-14: 「이메일 주소를
+      //   수강생이 뭘로 할지 몰라」). 예전 양식에 이메일 칸이 있어도 버린다.
+      // 엑셀이 0402 를 **숫자** 402 로 저장하므로 숫자 칸만 4자리로 되돌린다. 글자로 적은 「12」까지
+      // 「0012」로 채우면 오타가 통과한다. 전화번호를 통째로 적어도 뒤 4자리만 쓴다.
+      const phoneKey = ['연락처끝4', '연락처 끝 4자리', '휴대폰 끝 4자리', '연락처', 'phone_last4']
+        .find(k => row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '');
+      const phoneRaw = phoneKey ? row[phoneKey] : '';
+      const phoneDigits = String(phoneRaw).replace(/\D/g, '');
+      const phone = typeof phoneRaw === 'number' ? phoneDigits.slice(-4).padStart(4, '0') : phoneDigits.slice(-4);
+      const name = pick('성함', '이름', 'name').replace(/\s+/g, ' ');
       const amountRaw = pick('이용기간', '기간', 'valid_amount');
       const amount = Number(amountRaw) || 3;
       const unitRaw = pick('기간단위', '단위', 'valid_unit') || '개월';
       const devices = Number(pick('허용기기', 'max_devices')) || 2;
-      const type = pick('유형', 'member_type') || 'student';
+      const typeRaw = pick('유형', 'member_type') || '수강생';
       const out = {
-        email,
-        name: pick('성함', '이름', 'name') || null,
+        name: name || null,
         phone_last4: phone || null,
         cohort: pick('기수', 'cohort') || null,
-        member_type: ['student', 'subscription', 'staff', 'event'].includes(type) ? type : 'student',
+        member_type: ED_TYPE_CODE[typeRaw] || 'student',
         valid_amount: amount,
         valid_unit: PRE_UNITS[unitRaw] || 'months',
         max_devices: devices,
         memo: pick('메모', 'memo') || null,
       };
       // 무엇이 잘못됐는지 행마다 남긴다 — 통째로 거절하면 어디를 고칠지 알 수 없다.
-      // ★양식의 예시 줄을 안 지우고 올리면 example@gmail.com 이 미리 승인된다 — 그 주소를 가진
-      //   누군가가 가입하면 그대로 자동 승인이다. 예시 줄은 올리지 않는다.
-      if (email === 'example@gmail.com' || /이 행은 지우세요/.test(out.memo || '')) out.problem = '양식 예시 줄 — 지우고 올리세요';
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.problem = '이메일 형식';
-      else if (phone && phone.length !== 4) out.problem = '연락처 끝 4자리';
+      // ★양식의 예시 줄(홍길동 · 1234)을 안 지우고 올리면 그 성함·끝 4자리로 가입하는 누군가가
+      //   그대로 자동 승인이다. 예시 줄은 올리지 않는다.
+      if (/이 행은 지우세요/.test(out.memo || '') || (name === '홍길동' && phone === '1234')) out.problem = '양식 예시 줄 — 지우고 올리세요';
+      else if (name.length < 2) out.problem = '성함 2자 이상';
+      else if (phone.length !== 4) out.problem = '연락처 끝 4자리';
+      else if (!ED_TYPE_CODE[typeRaw]) out.problem = '유형은 수강생·구독·내부·이벤트';
       else if (!Number.isInteger(amount) || amount < 1 || amount > 120) out.problem = '이용기간 1~120';
       else if (!Number.isInteger(devices) || devices < 1 || devices > 10) out.problem = '허용기기 1~10';
       return out;
@@ -2824,8 +2845,8 @@
         const tr = document.createElement('tr');
         if (r.problem) tr.style.opacity = '0.45';
         const unitLabel = { months: '개월', weeks: '주', days: '일' }[r.valid_unit];
-        for (const v of [r.email, r.name || '-', r.phone_last4 || '-', r.cohort || '-',
-          r.member_type, `${r.valid_amount}${unitLabel}`, String(r.max_devices)]) {
+        for (const v of [r.name || '-', r.phone_last4 || '-', r.cohort || '-',
+          ED_TYPE_LABEL[r.member_type] || r.member_type, `${r.valid_amount}${unitLabel}`, String(r.max_devices)]) {
           const td = document.createElement('td');
           td.textContent = v;                 // 사람이 적은 값이다. HTML 로 넣지 않는다
           tr.appendChild(td);
@@ -2851,9 +2872,9 @@
     async function commitPreapprovedUpload() {
       const rows = preUploadRows.filter(r => !r.problem).map(({ problem, ...rest }) => rest);
       if (!rows.length) { toast('올릴 수 있는 행이 없습니다', 'error'); return; }
-      if (!confirm(`${rows.length}명을 사전 승인 명단에 올릴까요?\n\n올린 분이 앱에서 가입하는 순간 자동으로 승인됩니다.`)) return;
+      if (!confirm(`${rows.length}명을 사전 승인 명단에 올릴까요?\n\n같은 성함·연락처 끝 4자리로 앱에서 가입하는 순간 자동으로 승인됩니다.`)) return;
 
-      // ★한 건씩 보낸다. 통째로 보내면 한 줄(이미 명단에 있는 이메일)이 전부를 되돌린다.
+      // ★한 건씩 보낸다. 통째로 보내면 한 줄(이미 명단에 있는 성함·끝 4자리)이 전부를 되돌린다.
       let ok = 0; const failed = [];
       for (const row of rows) {
         try {
@@ -2861,7 +2882,7 @@
           ok++;
         } catch (e) {
           const dup = /duplicate|unique/i.test(e.message || '');
-          failed.push(`${row.email}${dup ? ' (이미 명단에 있음)' : ''}`);
+          failed.push(`${edPreWho(row)}${dup ? ' (이미 명단에 있음)' : ''}`);
         }
       }
       toast(failed.length
@@ -2871,8 +2892,8 @@
       await loadPreapproved();
     }
 
-    async function cancelPreapproved(id, email) {
-      if (!confirm(`${email} 을 명단에서 뺄까요?\n이미 가입한 분에게는 영향이 없습니다.`)) return;
+    async function cancelPreapproved(id, who) {
+      if (!confirm(`${who} 을(를) 명단에서 뺄까요?\n이미 가입한 분에게는 영향이 없습니다.`)) return;
       try {
         await supabaseDelete('uvengers_editor_preapproved', `id=eq.${encodeURIComponent(id)}`);
         toast('명단에서 뺐습니다', 'success');
