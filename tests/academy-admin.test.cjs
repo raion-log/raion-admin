@@ -7,7 +7,9 @@ const source = fs.readFileSync(require('node:path').join(__dirname,'../academy-a
 class Element {
   constructor(tag) { this.tagName=tag; this.children=[]; this.attrs={}; this.events={}; this.textContent=''; this.value=''; }
   append(...nodes) { this.children.push(...nodes); }
-  appendChild(node) { this.children.push(node); return node; }
+  appendChild(node) { node.parent=this; this.children.push(node); return node; }
+  remove() { if(this.parent) this.parent.children=this.parent.children.filter(n=>n!==this); }
+  close() { this.open=false; this.events.close?.(); }
   replaceChildren(...nodes) { this.children=nodes; }
   setAttribute(k,v) { this.attrs[k]=v; }
   addEventListener(k,v) { this.events[k]=v; }
@@ -51,12 +53,79 @@ test('table cells never break a word across two lines', () => {
 
 function setup(rpc,confirm=()=>true,timers={setTimeout,clearTimeout}) {
   const root=new Element('section');
-  const window={confirm};
-  vm.runInNewContext(source,{window,AbortController,...timers,document:{createElement:tag=>new Element(tag)}});
+  const window={confirm:()=>{throw new Error('Native confirm must not be used');}};
+  vm.runInNewContext(source,{window,AbortController,...timers,document:{createElement:tag=>{
+    const node=new Element(tag);
+    if(tag==='dialog') node.showModal=()=>{
+      node.open=true;
+      if(confirm) findButton(node,confirm(textOf(node))?'확인하고 적용':'취소하고 돌아가기').events.click();
+    };
+    return node;
+  }}});
   return {root,admin:window.createAcademyAdmin({rpc},root)};
 }
 const textOf = node => [node.textContent,...node.children.map(textOf)].join(' ');
 const findButton = (root,text)=>root.querySelectorAll('button').find(n=>n.textContent===text);
+
+async function manualRoster() {
+  const calls=[];
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    return args.action==='admin_snapshot' ? {data:{...copy,cohorts:[{id:1,name:'검증 1기',status:'active'}]}} : {data:{ok:true}};
+  },null);
+  await admin.load();
+  const direct=root.querySelectorAll('section').find(n=>String(n.className).includes('academy-direct-add'));
+  const inputs=direct.querySelectorAll('input');
+  inputs.find(n=>n.placeholder==='수강생 이름').value='합성 검증';
+  inputs.find(n=>n.placeholder==='끝 4자리').value='4826';
+  const reason=inputs.find(n=>n.placeholder==='예: 수강 명단과 신청 정보를 확인함');
+  reason.value='검증 사유';
+  const cohort=direct.querySelectorAll('select').find(n=>n.required);
+  cohort.value='1'; cohort.selectedOptions=[{textContent:'검증 1기'}];
+  return {root,admin,calls,reason,add:findButton(root,'수강 명단에 추가')};
+}
+test('in-page confirmation blocks writes, cancels with Escape, and permits retry',async()=>{
+  const {root,calls,add}=await manualRoster();
+  const pending=add.events.click();
+  const dialog=root.querySelectorAll('dialog')[0];
+  assert.equal(dialog.open,true);
+  assert.equal(calls.length,1);
+  assert.equal(add.disabled,true);
+  assert.equal(findButton(dialog,'취소하고 돌아가기').focused,true);
+  let prevented=false;
+  dialog.events.cancel({preventDefault(){prevented=true;}});
+  await pending;
+  assert.equal(prevented,true);
+  assert.equal(calls.length,1);
+  assert.equal(root.querySelectorAll('dialog').length,0);
+  assert.equal(add.disabled,false);
+  const retry=add.events.click();
+  findButton(root,'취소하고 돌아가기').events.click();
+  await retry;
+  assert.equal(calls.length,1);
+});
+test('explicit confirmation sends one snapshotted payload despite duplicate clicks',async()=>{
+  const {root,calls,add,reason}=await manualRoster();
+  const pending=add.events.click();
+  await add.events.click();
+  reason.value='변경된 사유';
+  const apply=findButton(root,'확인하고 적용');
+  apply.events.click(); apply.events.click();
+  await pending;
+  assert.equal(calls.filter(c=>c.action==='roster_add').length,1);
+  assert.equal(calls[1].payload.reason,'검증 사유');
+});
+test('clear invalidates both an open and a just-accepted confirmation before RPC',async()=>{
+  for(const accept of [false,true]) {
+    const {root,admin,calls,add}=await manualRoster();
+    const pending=add.events.click();
+    if(accept) findButton(root,'확인하고 적용').events.click();
+    admin.clear();
+    await pending;
+    assert.equal(calls.length,1);
+    assert.equal(root.children.length,0);
+  }
+});
 
 test('load errors are not rendered as empty queues and raw server detail is not leaked',async()=>{
   const {root,admin}=setup(async()=>({error:{code:'42501',message:'private email@example.test'}}));

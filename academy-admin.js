@@ -106,6 +106,40 @@
       }
       return select;
     }
+    let cancelConfirmation = null;
+    function confirmChange(text) {
+      const token = epoch;
+      const previousFocus = document.activeElement;
+      busy = true;
+      disabled(true);
+      return new Promise(resolve => {
+        const dialog = el('dialog', undefined, 'academy-confirm');
+        dialog.setAttribute('aria-label', '변경 내용 확인');
+        const finish = accepted => {
+          if (cancelConfirmation !== cancel) return;
+          cancelConfirmation = null;
+          if (dialog.open) dialog.close();
+          dialog.remove();
+          if (!accepted && token === epoch) {
+            busy = false;
+            disabled(false);
+            if (previousFocus?.isConnected) previousFocus.focus();
+          }
+          resolve(accepted && token === epoch);
+        };
+        const cancel = () => finish(false);
+        cancelConfirmation = cancel;
+        const cancelButton = button('취소하고 돌아가기', cancel);
+        const actions = el('div', undefined, 'academy-actions');
+        actions.append(cancelButton, button('확인하고 적용', () => finish(true)));
+        dialog.append(el('h3', '변경 내용 확인'), el('p', text + '\n변경은 학습실에만 적용됩니다.'), actions);
+        dialog.addEventListener('cancel', event => { event.preventDefault(); cancel(); });
+        dialog.addEventListener('close', cancel);
+        root.appendChild(dialog);
+        try { dialog.showModal(); cancelButton.focus(); }
+        catch { cancel(); message('확인창을 열지 못했습니다. 브라우저를 새로고침해주세요.', true); }
+      });
+    }
     async function mutate(action, values, reason, confirmation) {
       if (busy) return;
       // ★사유가 비면 까닭을 **그 칸 바로 아래**에서도 말한다. 맨 위 문구만으로는 판에서
@@ -122,11 +156,13 @@
         reason.focus(); return;
       }
       if (wrap?.stopNote) wrap.stopNote.textContent = '';
-      if (!global.confirm(confirmation + '\n변경은 학습실에만 적용됩니다.')) return;
+      const payload = { ...values, reason: reason.value.trim() };
+      const confirmationEpoch = epoch;
+      if (!await confirmChange(confirmation) || confirmationEpoch !== epoch) return;
       busy = true; disabled(true); message('처리 중입니다. 창을 닫지 마세요.');
       const token = epoch;
       try {
-        const { data, error } = await request(action, { ...values, reason: reason.value.trim() });
+        const { data, error } = await request(action, payload);
         if (token !== epoch) return;
         if (error || data?.ok !== true) throw error || new Error('invalid_response');
         if (action === 'roster_add') rosterCohortFilter = String(values.cohort_id);
@@ -457,7 +493,10 @@
     async function bulkRosterAdd(entries, reason) {
       if (busy) return;
       if (!reason.value.trim()) { message('등록 사유를 입력해주세요.', true); reason.focus(); return; }
-      if (!global.confirm(entries.length + '명을 수강 명단에 올릴까요?\n변경은 학습실에만 적용됩니다.')) return;
+      entries = entries.map(entry => ({ ...entry }));
+      const confirmedReason = reason.value.trim();
+      const confirmationEpoch = epoch;
+      if (!await confirmChange(entries.length + '명을 수강 명단에 올릴까요?') || confirmationEpoch !== epoch) return;
       busy = true; disabled(true); message(entries.length + '명을 올리는 중입니다. 창을 닫지 마세요.');
       const token = epoch;
       const failed = [];
@@ -467,7 +506,7 @@
           const { data, error } = await request('roster_add', {
             cohort_id: entry.cohort_id, display_name: entry.display_name,
             gmail_local_id: '', phone_last_four: entry.phone_last_four,
-            source_reference: '', reason: reason.value.trim() });
+            source_reference: '', reason: confirmedReason });
           if (token !== epoch) return;
           if (error || data?.ok !== true) failed.push(entry.display_name); else done += 1;
         }
@@ -798,7 +837,7 @@
         }
       }
     }
-    function clear() { epoch++; busy = false; pageOffset = 0; rosterCohortFilter = 'all'; root.replaceChildren(); }
+    function clear() { epoch++; cancelConfirmation?.(); busy = false; pageOffset = 0; rosterCohortFilter = 'all'; root.replaceChildren(); }
     return { load, clear };
   }
   global.createAcademyAdmin = createAcademyAdmin;

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>합성 데이터 확인창 검증 — 실제 DB 연결 없음</title>
+<link rel="stylesheet" href="../academy-admin.css">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#141414;color:#eee;font:16px sans-serif;margin:20px}.btn{background:#333;color:#fff;border:1px solid #777;border-radius:6px;padding:10px;cursor:pointer}</style>
+<h1>합성 데이터 검증 · 실제 DB 연결 없음</h1><p id="count">등록 요청: 0</p><section id="academy" class="academy-admin"></section>
+<script src="../academy-admin.js"></script>
+<script>
+let writes=0;
+const snapshot={version:2,applications:[],students:[],roster:[],audit:[],cohorts:[{id:1,name:'검증 1기',status:'active',cohort_number:1}]};
+createAcademyAdmin({rpc:async(_name,args)=>{
+if(args.action==='admin_snapshot')return {data:snapshot};
+document.getElementById('count').textContent='등록 요청: '+(++writes);
+return {data:{ok:true}};
+}},document.getElementById('academy')).load();
+</script></html>
