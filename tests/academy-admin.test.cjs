@@ -267,6 +267,49 @@ test('a blocked add says why next to the button, not only at the top of the page
   await findButton(direct,'수강 명단에 추가').events.click();
   assert.equal(calls.filter(c=>c.action==='roster_add').length,1);
 });
+test('only a cancelled roster row that never had an account can be deleted, and the reason is required',async()=>{
+  // ★사용자 2026-09-14: 「취소된 명단도 삭제도 안되고」. 지울 수 있는 것은 취소된 줄 중
+  //   계정과 연결된 적 없는 줄뿐이다 — 연결된 적 있는 줄은 수강 기록과 이어져 있다.
+  const calls=[];
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
+  const roster=[
+    {id:31,cohort_id:1,revision:4,display_name:'지울 학생',canonical_gmail:null,phone_last_four:'3131',cohort_name:'유유스 1기',status:'cancelled',bound_user_id:null,source_reference:''},
+    {id:32,cohort_id:1,revision:2,display_name:'남길 학생',canonical_gmail:'keep@gmail.com',phone_last_four:'3232',cohort_name:'유유스 1기',status:'cancelled',bound_user_id:'u-keep',source_reference:''},
+    {id:33,cohort_id:1,revision:1,display_name:'현재 학생',canonical_gmail:null,phone_last_four:'3333',cohort_name:'유유스 1기',status:'eligible',bound_user_id:null,source_reference:''}
+  ];
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    if(args.action==='admin_snapshot') return {data:{...copy,cohorts:[cohort],roster,totals:{applications:0,students:0,roster:3}}};
+    return {data:{ok:true}};
+  });
+  await admin.load();
+  const list=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-management'));
+  const rowOf=name=>list.querySelectorAll('tr').find(node=>String(node.className)==='academy-roster-record'&&textOf(node).includes(name));
+  assert.ok(findButton(rowOf('지울 학생'),'삭제'),'취소됐고 연결된 적 없는 줄에는 삭제가 있다');
+  assert.equal(findButton(rowOf('남길 학생'),'삭제'),undefined,'연결된 적 있는 줄은 지우지 않는다');
+  assert.equal(findButton(rowOf('현재 학생'),'삭제'),undefined,'쓰고 있는 명단은 먼저 취소해야 한다');
+
+  findButton(rowOf('지울 학생'),'삭제').events.click();
+  assert.equal(findButton(rowOf('지울 학생'),'삭제').attrs['aria-expanded'],'true');
+  // 사유를 비우면 보내지 않는다.
+  await findButton(list,'영구 삭제').events.click();
+  assert.equal(calls.filter(c=>c.action==='roster_delete').length,0);
+  // 한 표 안에 수정·취소·삭제 사유 칸이 여럿이다 — 삭제 판을 id 로 집는다.
+  const panel=list.querySelectorAll('div').find(node=>node.id==='academy-roster-delete-31');
+  assert.equal(panel.hidden,false,'삭제 판이 열려 있어야 한다');
+  panel.querySelectorAll('input')[0].value='잘못 넣은 명단';
+  await findButton(list,'영구 삭제').events.click();
+  const sent=calls.filter(c=>c.action==='roster_delete');
+  assert.equal(sent.length,1);
+  assert.deepEqual(JSON.parse(JSON.stringify(sent[0].payload)),{roster_entry_id:31,revision:4,reason:'잘못 넣은 명단'});
+});
+test('server refusals for deletion and not-yet-applied actions read as plain Korean',()=>{
+  const start=source.indexOf('const errorMessage = (error) => {');
+  const end=source.indexOf('};',start)+2;
+  const errorMessage=new Function(source.slice(start,end)+' return errorMessage;')();
+  assert.match(errorMessage({message:'academy_roster_not_deletable',code:'22023'}),/지울 수 없습니다/);
+  assert.match(errorMessage({message:'academy_unknown_action',code:'22023'}),/서버에 아직 적용되지 않았습니다/);
+});
 test('current roster stays prominent while cancelled and internal reference records stay secondary',async()=>{
   const roster=[
     {id:2,revision:1,user_id:null,display_name:'현재 학생',canonical_gmail:'current@gmail.com',phone_last_four:'0402',cohort_name:'유유스 1기',status:'eligible',source_reference:'INTERNAL-CURRENT'},

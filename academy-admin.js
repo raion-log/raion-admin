@@ -16,6 +16,9 @@
     };
     const errorMessage = (error) => {
       if (error?.message === 'academy_session_required') return '로그인 세션이 만료되었거나 종료되었습니다. 다시 로그인해주세요.';
+      if (error?.message === 'academy_roster_not_deletable') return '계정과 연결된 적이 있거나 취소되지 않은 명단은 지울 수 없습니다. 먼저 취소하거나, 연결된 줄은 그대로 두세요.';
+      // 화면이 서버보다 먼저 올라가면 새 동작을 서버가 모른다 — 고장이 아니라 적용 대기라고 말한다.
+      if (error?.message === 'academy_unknown_action') return '이 기능이 서버에 아직 적용되지 않았습니다. 잠시 뒤 새로고침해 다시 시도해주세요.';
       if (error?.code === '42501') return '학습실 관리 권한을 확인하지 못했습니다. 학습실 전용 관리자 등록을 확인해주세요.';
       if (error?.code === 'PGRST202' || error?.code === '42883') return '학습실 DB API가 아직 적용되지 않았습니다. DB 적용·권한 검증 후 다시 불러오세요.';
       if (error?.code === '40001') return '다른 화면에서 이 정보가 바뀌었습니다. 다시 불러온 뒤 확인해주세요.';
@@ -644,6 +647,24 @@
           cancelAction.setAttribute('aria-expanded','false');
           panels.push([cancelAction,cancelPanel]);
           actions.appendChild(cancelAction);
+        }
+        // ★취소된 명단 중 **계정과 연결된 적 없는 줄만** 지운다 (사용자 2026-09-14:
+        //   「취소된 명단도 삭제도 안되고」). 목록에서는 사라져도 누가 언제 왜 지웠는지는
+        //   서버 기록에 이름·끝 4자리·기수와 함께 남는다. 연결된 적 있는 줄은 서버가 거부한다.
+        if(row.status==='cancelled' && !row.bound_user_id) {
+          const deleteReason=reasonField();
+          const deleteFields=el('div',undefined,'academy-fields');
+          deleteFields.appendChild(field('삭제 사유',deleteReason));
+          const deletePanel=actionPanel(`academy-roster-delete-${row.id}`,'명단 영구 삭제',[
+            el('p','목록에서 완전히 사라지고 되돌릴 수 없습니다. 누가 언제 왜 지웠는지는 기록에 남습니다.','academy-notice'),
+            deleteFields,
+            button('영구 삭제',()=>mutate('roster_delete',{roster_entry_id:row.id,revision:row.revision},deleteReason,
+              `${row.display_name}(끝 ${row.phone_last_four}) ${row.cohort_name} 명단을 영구 삭제할까요?\n되돌릴 수 없습니다.`),'danger')]);
+          const deleteAction=button('삭제',()=>togglePanel(deleteAction,deletePanel,panels),'danger');
+          deleteAction.setAttribute('aria-controls',deletePanel.id);
+          deleteAction.setAttribute('aria-expanded','false');
+          panels.push([deleteAction,deletePanel]);
+          actions.appendChild(deleteAction);
         }
         if(row.status==='bound') actions.appendChild(el('span','수강생 관리에서 변경','academy-roster-readonly'));
         tr.append(identity,
