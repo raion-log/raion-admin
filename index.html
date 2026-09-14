@@ -92,6 +92,17 @@
        회원 행이 전부 두 줄이 됐다 — 세로만 두 배로 먹고 얻는 것이 없었다(사용자 2026-09-14).
        모자라면 줄을 늘리지 말고 .table-scroll 이 가로로 민다. */
     .ed-valid-cell { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+    /* ★기기는 한 줄로 접는다 — 허용이 10대까지라 펼쳐 두면 한 회원이 열 줄을 먹었다 (사용자 2026-09-14).
+       두 대 이상은 「N대 · 최근 날짜」를 눌러 펼친다. 펼쳤을 때만 그 줄이 늘어난다. */
+    .ed-dev-item { display: flex; gap: 4px; align-items: center; white-space: nowrap; margin: 2px 0; }
+    .ed-dev-name, .ed-dev-none { font-size: 11px; color: var(--text3); }
+    .ed-dev-release { padding: 1px 6px; font-size: 10px; }
+    .ed-dev > summary { cursor: pointer; white-space: nowrap; font-size: 11px; color: var(--text2); list-style: none; }
+    .ed-dev > summary::-webkit-details-marker { display: none; }
+    .ed-dev > summary::after { content: ' ▾'; color: var(--text3); }
+    .ed-dev[open] > summary::after { content: ' ▴'; }
+    .ed-dev > summary:hover { color: var(--accent); }
+    .ed-dev-list { margin-top: 4px; }
     .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
     .badge-active { background: rgba(39,174,96,0.15); color: var(--green); }
     .badge-revoked { background: rgba(233,69,96,0.15); color: var(--red); }
@@ -2452,7 +2463,11 @@
     // ★「차단」은 자리를 남긴다. 잘못 넣은 것을 되돌리려면 계정까지 지워야 한다.
     //   회원행만 지우면 계정이 남아, 그 사람이 다시 가입할 때 "이미 있는 계정"으로
     //   조용히 막힌다(메일도 안 간다).
-    async function deleteEditorMember(id, email) {
+    // ★이메일은 onclick 문자열로 넘기지 않고 id 로 찾는다. 가입자가 정한 이메일에 따옴표가 있으면
+    //   edEsc 의 &#39; 를 HTML 속성이 JS 보다 먼저 ' 로 되돌려 문자열을 깨고 코드가 돈다
+    //   (2026-09-14 진짜 Chrome 에서 재현 — 「삭제」를 누르는 순간 심은 코드가 실행됐다).
+    async function deleteEditorMember(id) {
+      const email = (editorMembers.find(member => member.id === id) || {}).email || '(이메일 없음)';
       if (!confirm(`${email}\n\n이 회원을 완전히 삭제할까요?\n\n· 회원 정보와 승인 기기가 사라집니다\n· 로그인 계정도 함께 지워집니다\n· 되돌릴 수 없습니다\n\n이용을 잠시 막으려는 것이라면 '차단'을 쓰세요.`)) return;
       try {
         const out = await supabaseFunction('editor-admin-delete-member', { id, email });
@@ -2576,7 +2591,8 @@
 
     // 만료 상태 — 구독 운영에서 가장 자주 봐야 하는 값
     function edExpiryInfo(m) {
-      if (!m.valid_until) return { cls: 'badge-registered', text: '기간 없음', days: null };
+      // 서버는 기간이 비면 만료로 막는다 — 화면도 같은 말을 한다.
+      if (!m.valid_until) return { cls: 'badge-inactive', text: '기간 없음 · 사용 불가', days: null };
       const days = Math.ceil((new Date(m.valid_until) - new Date()) / 86400000);
       if (days < 0)  return { cls: 'badge-inactive', text: `만료 ${-days}일 지남`, days };
       if (days <= 7) return { cls: 'badge-pending',  text: `D-${days}`, days };
@@ -2602,7 +2618,9 @@
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
       a.download = `uv-editor-${kind}-${new Date().toISOString().slice(0,10)}.csv`;
-      a.click(); URL.revokeObjectURL(a.href);
+      // 문서에 붙여 누르고, 주소는 다음 틱에 푼다 — 붙이지 않거나 바로 풀면 일부 브라우저가 내려받기를 버린다.
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 0);
     }
 
     async function loadEditorMembers() {
@@ -2789,7 +2807,10 @@
         memo: pick('메모', 'memo') || null,
       };
       // 무엇이 잘못됐는지 행마다 남긴다 — 통째로 거절하면 어디를 고칠지 알 수 없다.
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.problem = '이메일 형식';
+      // ★양식의 예시 줄을 안 지우고 올리면 example@gmail.com 이 미리 승인된다 — 그 주소를 가진
+      //   누군가가 가입하면 그대로 자동 승인이다. 예시 줄은 올리지 않는다.
+      if (email === 'example@gmail.com' || /이 행은 지우세요/.test(out.memo || '')) out.problem = '양식 예시 줄 — 지우고 올리세요';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.problem = '이메일 형식';
       else if (phone && phone.length !== 4) out.problem = '연락처 끝 4자리';
       else if (!Number.isInteger(amount) || amount < 1 || amount > 120) out.problem = '이용기간 1~120';
       else if (!Number.isInteger(devices) || devices < 1 || devices > 10) out.problem = '허용기기 1~10';
@@ -2914,7 +2935,7 @@
             <select id="ed-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
             <button class="btn btn-small btn-primary" onclick="approveEditorMember('${m.id}')">승인</button>
             <button class="btn btn-small btn-danger" onclick="updateEditorMember('${m.id}', { status: 'blocked' })">거부</button>
-            <button class="btn btn-small btn-outline" onclick="deleteEditorMember('${m.id}', '${edEsc(m.email)}')">삭제</button>
+            <button class="btn btn-small btn-outline" onclick="deleteEditorMember('${m.id}')">삭제</button>
           </td></tr>`;
       }).join('');
     }
@@ -2932,7 +2953,7 @@
                         (m.status||'').toLowerCase().includes(search))) return false;
         const d = edExpiryInfo(m).days;
         if (mode === 'expiring') return m.status === 'approved' && d !== null && d >= 0 && d <= 7;
-        if (mode === 'expired')  return d !== null && d < 0;
+        if (mode === 'expired')  return d === null || d < 0;   // 기간 없음도 서버에선 만료다
         if (mode === 'blocked')  return m.status === 'blocked';
         if (mode === 'nocohort') return !m.cohort;
         return true;
@@ -2955,12 +2976,20 @@
         const startDate = m.started_at ? new Date(m.started_at).toLocaleDateString('ko-KR') : '-';
         const typeBadge = edTypeBadge(m) || '<span style="font-size:11px;color:var(--text3);">수강생</span>';
         // ★남은 날짜는 뱃지 하나로만 말한다. 예전엔 뱃지와 이 줄이 같은 말을 두 번 했다.
+        // ★기기는 **한 줄로 접는다** (사용자 2026-09-14: 「기기가 많아지면 그대로 다 리스트가 되니까
+        //   그 셀이 너무 커진다」). 허용이 10대까지라 펼쳐 두면 한 회원이 열 줄을 먹었다.
+        //   한 대면 그 자리에서 해제하고, 두 대 이상이면 「N대 · 최근 날짜 ▾」를 눌러 펼친다.
         const devs = editorDevices.filter(d => d.member_id === m.id);
-        const devList = devs.length ? devs.map(d => {
+        const devLine = d => {
           const seen = d.last_seen ? new Date(d.last_seen).toLocaleDateString('ko-KR') : '-';
           const label = edEsc(d.device_label || d.device_uuid.slice(0,8));
-          return `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;"><span style="font-size:11px;color:var(--text3);">${label} (${seen})</span><button class="btn btn-small btn-outline" style="padding:1px 6px;font-size:10px;" onclick="removeEditorDevice('${d.id}')">해제</button></div>`;
-        }).join('') : '<span style="font-size:11px;color:var(--text3);">없음</span>';
+          return `<div class="ed-dev-item"><span class="ed-dev-name">${label} (${seen})</span><button class="btn btn-small btn-outline ed-dev-release" onclick="removeEditorDevice('${d.id}')">해제</button></div>`;
+        };
+        const newestSeen = devs[0] && devs[0].last_seen   // editorDevices 는 last_seen 내림차순으로 받는다
+          ? new Date(devs[0].last_seen).toLocaleDateString('ko-KR') : '-';
+        const devList = !devs.length ? '<span class="ed-dev-none">없음</span>'
+          : devs.length === 1 ? devLine(devs[0])
+          : `<details class="ed-dev"><summary><b>${devs.length}대</b> · 최근 ${newestSeen}</summary><div class="ed-dev-list">${devs.map(devLine).join('')}</div></details>`;
         return `<tr>
           <td>${edCheckbox('member', m)}</td>
           <td style="font-size:12px;">${edEsc(m.email)}</td>
@@ -2977,11 +3006,11 @@
               <select id="ed-ext-unit-${m.id}" style="${st}"><option value="months" selected>개월</option><option value="weeks">주</option><option value="days">일</option></select>
               <button class="btn btn-small btn-outline" style="padding:2px 6px;font-size:10px;" onclick="extendEditorMember('${m.id}')">연장</button>
             </div></td>
-          <td><input type="number" value="${m.max_devices ?? 2}" min="1" max="10" style="${st}width:48px;text-align:center;" onchange="updateEditorMember('${m.id}', { max_devices: parseInt(this.value) })"></td>
+          <td><input type="number" value="${m.max_devices ?? 2}" min="1" max="10" style="${st}width:48px;text-align:center;" onchange="setEditorMaxDevices('${m.id}', this)"></td>
           <td>${devList}</td>
           <td class="actions">
             <button class="btn btn-small ${m.status === 'approved' ? 'btn-danger' : 'btn-primary'}" onclick="updateEditorMember('${m.id}', { status: '${m.status === 'approved' ? 'blocked' : 'approved'}' })">${m.status === 'approved' ? '차단' : '승인'}</button>
-            <button class="btn btn-small btn-outline" onclick="deleteEditorMember('${m.id}', '${edEsc(m.email)}')">삭제</button>
+            <button class="btn btn-small btn-outline" onclick="deleteEditorMember('${m.id}')">삭제</button>
           </td>
         </tr>`;
       }).join('');
@@ -3002,8 +3031,25 @@
       const base = (m && m.valid_until && new Date(m.valid_until) > new Date()) ? new Date(m.valid_until) : new Date();
       await updateEditorMember(id, { valid_until: edAddPeriod(base, amount, unit) });
     }
+    // ★날짜를 비우면 서버는 그 회원을 **만료**로 본다(supabase_schema.sql: valid_until is null → expired).
+    //   예전 화면은 같은 상태를 회색 「기간 없음」으로 보여 줘, 실수로 지우면 수강생은 막히는데
+    //   관리자 눈에는 멀쩡해 보였다. 비우기 전에 묻고, 취소하면 원래 날짜로 되돌린다.
     async function setEditorValidUntil(id, dateStr) {
+      if (!dateStr && !confirm('날짜를 비우면 이 회원은 바로 에디터를 쓸 수 없게 됩니다(만료로 처리).\n\n비울까요?')) {
+        renderEditorMembers();
+        return;
+      }
       await updateEditorMember(id, { valid_until: dateStr ? dateStr + 'T23:59:59+09:00' : null });
+    }
+    // 허용 기기 칸은 입력 모양만 1~10 이고 막지는 않았다 — 비우면 NaN 이 null 로 가고 0·99 도 그대로 갔다.
+    async function setEditorMaxDevices(id, field) {
+      const value = Number(field.value);
+      if (!Number.isInteger(value) || value < 1 || value > 10) {
+        toast('허용 기기는 1~10대로 입력해주세요', 'error');
+        renderEditorMembers();
+        return;
+      }
+      await updateEditorMember(id, { max_devices: value });
     }
     async function updateEditorMember(id, updates) {
       try {
@@ -3031,13 +3077,14 @@
       empty.classList.add('hidden');
       const st = edInput();
       const typeLabel = { subscription:'구독', event:'이벤트', staff:'내부', student:'수강생' };
-      tbody.innerHTML = editorCodes.map(c => `<tr>
+      // 코드 글자도 onclick 문자열에 넣지 않는다 — 줄 번호로 넘겨 목록에서 꺼낸다(회원 이메일과 같은 까닭).
+      tbody.innerHTML = editorCodes.map((c, i) => `<tr>
         <td style="font-weight:600;">${edEsc(c.code)}</td>
         <td>${typeLabel[c.member_type] || edEsc(c.member_type)}</td>
-        <td><input type="text" value="${edEsc(c.cohort || '')}" placeholder="예: 유유스 1기" style="${st}width:120px;" onchange="updateEditorCode('${edEsc(c.code)}', { cohort: this.value.trim() || null })"></td>
-        <td><input type="text" value="${edEsc(c.memo || '')}" style="${st}width:160px;" onchange="updateEditorCode('${edEsc(c.code)}', { memo: this.value })"></td>
-        <td><button class="btn btn-small ${c.active ? 'btn-primary' : 'btn-outline'}" onclick="updateEditorCode('${edEsc(c.code)}', { active: ${!c.active} })">${c.active ? '활성' : '비활성'}</button></td>
-        <td class="actions"><button class="btn btn-small btn-danger" onclick="deleteEditorCode('${edEsc(c.code)}')">삭제</button></td>
+        <td><input type="text" value="${edEsc(c.cohort || '')}" placeholder="예: 유유스 1기" style="${st}width:120px;" onchange="updateEditorCode(editorCodes[${i}].code, { cohort: this.value.trim() || null })"></td>
+        <td><input type="text" value="${edEsc(c.memo || '')}" style="${st}width:160px;" onchange="updateEditorCode(editorCodes[${i}].code, { memo: this.value })"></td>
+        <td><button class="btn btn-small ${c.active ? 'btn-primary' : 'btn-outline'}" onclick="updateEditorCode(editorCodes[${i}].code, { active: ${!c.active} })">${c.active ? '활성' : '비활성'}</button></td>
+        <td class="actions"><button class="btn btn-small btn-danger" onclick="deleteEditorCode(editorCodes[${i}].code)">삭제</button></td>
       </tr>`).join('');
     }
     async function addEditorCode() {

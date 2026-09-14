@@ -91,7 +91,8 @@ test('a member can be deleted outright, not just blocked', () => {
   // Blocking leaves the row in place. To undo a mistaken entry the login account has to go
   // too — otherwise that person is silently rejected on their next sign-up ("already exists",
   // no e-mail sent).
-  assert.match(source, /async function deleteEditorMember\(id, email\)/);
+  // The e-mail is looked up by id, never passed through the onclick string (see the injection test).
+  assert.match(source, /async function deleteEditorMember\(id\) \{\s*const email = \(editorMembers\.find\(member => member\.id === id\)/);
   assert.match(source, /supabaseFunction\('editor-admin-delete-member', \{ id, email \}\)/);
   // Both lists get the button: pending applicants and approved members.
   assert.ok((source.match(/onclick="deleteEditorMember\(/g) || []).length >= 2);
@@ -100,6 +101,44 @@ test('a member can be deleted outright, not just blocked', () => {
   assert.match(source, /'차단'을 쓰세요/);
   // A half-finished delete must be reported, never swallowed into a success toast.
   assert.match(source, /case 'account_delete_failed':/);
+});
+
+test('text people typed never lands inside an inline event handler string in the editor tab', () => {
+  // ★2026-09-14 real Chrome: an e-mail like  x');window.__pwned=1;//@gmail.com  ran its code the
+  //   moment 삭제 was clicked. edEsc turns ' into &#39;, but the HTML attribute decodes it back to '
+  //   before the JS runs. Members pick their own e-mail at sign-up, so it is attacker text.
+  const editor = source.slice(source.indexOf('function renderEditorPending()'), source.indexOf('(async function boot()'));
+  const handlers = editor.match(/on(click|change)="[^"]*"/g) || [];
+  assert.ok(handlers.length > 10, 'the editor tab should still have its handlers');
+  for (const h of handlers) {
+    assert.doesNotMatch(h, /edEsc\(/, `escaped text inside a handler is still injectable: ${h}`);
+    assert.doesNotMatch(h, /\$\{(m|c|d|p)\.(email|name|code|memo|cohort|device_label)/, `raw typed text inside a handler: ${h}`);
+  }
+});
+
+test('the device cell folds to one line and a cleared date is not shown as harmless', () => {
+  // 사용자 2026-09-14: 「기기가 많아지면 그대로 다 리스트가 되니까 그 셀이 너무 커진다」 — up to 10 devices.
+  assert.match(source, /devs\.length === 1 \? devLine\(devs\[0\]\)/);
+  assert.match(source, /<details class="ed-dev"><summary><b>\$\{devs\.length\}대<\/b> · 최근 \$\{newestSeen\}<\/summary>/);
+  assert.match(source, /\.ed-dev-item \{ display: flex;[^}]*white-space: nowrap;/);
+  // The server treats valid_until = null as expired (supabase_schema.sql). The screen used to
+  // call it a grey 「기간 없음」, so clearing the date by accident locked the student out silently.
+  assert.match(source, /if \(!m\.valid_until\) return \{ cls: 'badge-inactive', text: '기간 없음 · 사용 불가'/);
+  assert.match(source, /if \(!dateStr && !confirm\('날짜를 비우면 이 회원은 바로 에디터를 쓸 수 없게 됩니다/);
+  assert.match(source, /if \(mode === 'expired'\)  return d === null \|\| d < 0;/);
+  // The inline device limit used to send NaN/0/99 straight to the table.
+  assert.match(source, /onchange="setEditorMaxDevices\('\$\{m\.id\}', this\)"/);
+});
+
+test('the Excel template example row is never uploaded as a real pre-approval', () => {
+  // Forgetting to delete it pre-approved example@gmail.com — whoever owns that address would be auto-approved.
+  const start = source.indexOf('function parsePreapprovedRow(row)');
+  const end = source.indexOf('function renderPreUpload()');
+  const PRE_UNITS = { '개월': 'months', '월': 'months', '주': 'weeks', '일': 'days' };
+  const parse = new Function('PRE_UNITS', source.slice(start, end) + 'return parsePreapprovedRow;')(PRE_UNITS);
+  assert.match(parse({ '이메일': 'example@gmail.com', '성함': '홍길동', '메모': '예시 (이 행은 지우세요)' }).problem, /예시 줄/);
+  assert.match(parse({ '이메일': 'real@gmail.com', '메모': '예시 (이 행은 지우세요)' }).problem, /예시 줄/);
+  assert.equal(parse({ '이메일': 'real@gmail.com', '성함': '김철수', '메모': '예시 강의 수강' }).problem, undefined);
 });
 
 test('remaining days are shown once, as a badge', () => {
