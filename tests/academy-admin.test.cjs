@@ -42,9 +42,10 @@ test('table cells never break a word across two lines', () => {
   for (const rule of [
     '.academy-admin .academy-table th,',
     '.academy-admin .academy-table td { white-space: nowrap; }',
-    '.academy-admin .academy-table { width: 100%; border-collapse: collapse; min-width:',
-    // 칸 안의 입력이 width:100% 를 물려받으면 칸이 끝없이 넓어진다.
-    '.academy-admin .academy-table input[type="text"] { width: auto;'
+    '.academy-admin .academy-table { width: 100%; border-collapse: collapse; }',
+    // 칸 안의 입력이 width:100% 를 물려받거나 auto 로 커지면 표가 보이는 폭을 넘는다.
+    // 실측 2026-09-14, 1320px 창: 고치기 전 넘침 255px -> 0px.
+    '.academy-admin .academy-table input[type="text"] { width: 130px;'
   ]) assert.ok(css.includes(rule), `표 규칙이 사라졌다: ${rule}`);
 });
 
@@ -106,7 +107,7 @@ test('approval requires an explicit cohort, reason, confirmation and revision; d
     return new Promise(resolve=>{finish=resolve;});
   });
   await admin.load();
-  const approve=findButton(root,'승인하고 기수 배정');
+  const approve=findButton(root,'승인');
   await approve.events.click();
   assert.equal(calls.length,1);
   const select=root.querySelectorAll('select').find(node=>node.children.some(option=>String(option.textContent).includes('example@gmail.com')));
@@ -364,11 +365,14 @@ test('recent audit entries appear only on the related account',async()=>{
   const first=root.querySelectorAll('tr').find(node=>textOf(node).includes('studenta@gmail.com'));
   const second=root.querySelectorAll('tr').find(node=>textOf(node).includes('studentb@gmail.com'));
   // 「계정 관리」 접기는 없앴다 — 단추가 그 줄에 바로 선다.
-  assert.match(textOf(first),/이용 정지로 변경/);
+  // 단추 이름은 다른 탭과 같은 두 글자, 뜻은 title·aria-label 에 온전히 남는다.
+  assert.equal(findButton(first,'정지').title,'학생 가 학생 이용 정지로 변경');
+  assert.equal(findButton(first,'해지').attrs['aria-label'],'학생 가 학생 이용 해지로 변경');
   assert.doesNotMatch(textOf(first),/계정 관리/);
   assert.match(textOf(first),/최근 이력\s+2건.*이용 상태 변경.*이용 재개.*명단 자동 확인/);
   assert.doesNotMatch(textOf(first),/2기 배정/);
-  assert.match(textOf(second),/현재 기수 변경.*2기 배정/);
+  assert.match(textOf(second),/변경.*2기 배정/);
+  assert.equal(findButton(second,'변경').title,'학생 나 학생의 현재 기수 변경');
   assert.doesNotMatch(textOf(second),/이용 재개/);
 });
 test('one shared pagination advances all visible academy lists by 100',async()=>{

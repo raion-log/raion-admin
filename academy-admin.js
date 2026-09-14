@@ -49,6 +49,15 @@
       status.setAttribute('role', error ? 'alert' : 'status');
       status.textContent = text;
     }
+    // ★단추 이름은 다른 탭과 같은 두 글자다(차단·삭제·승인·거부). 긴 이름을 쓰면
+    //   수강생 표가 보이는 폭을 255px 넘겨 관리 칸이 잘렸다 (사용자 2026-09-14).
+    //   뜻은 title 과 aria-label 로 온전히 남긴다.
+    function briefButton(short, full, onClick, variant) {
+      const node = button(short, onClick, variant);
+      node.title = full;
+      node.setAttribute('aria-label', full);
+      return node;
+    }
     function button(text, onClick, variant = 'outline') {
       const node = el('button', text);
       node.type = 'button';
@@ -200,11 +209,11 @@
         const rosterCell = cell(rosterSelect);
         if (!matches.length) rosterCell.appendChild(el('p', '먼저 기수·명단에서 이 학생을 정확히 등록해주세요.', 'academy-notice'));
         const actions = el('div', undefined, 'actions');
-        actions.append(button('승인하고 기수 배정', () => {
+        actions.append(briefButton('승인', `${row.display_name} 학생을 승인하고 기수 배정`, () => {
           if (!rosterSelect.value) { message('이름·Gmail·끝 4자리가 모두 같은 수강 명단을 선택해주세요.', true); rosterSelect.focus(); return; }
           const name = rosterSelect.selectedOptions[0].textContent;
           return command('review', row, { decision: 'approve', roster_entry_id: Number(rosterSelect.value) }, reason, `${name} 명단과 신청을 묶어 승인할까요?`);
-        }, 'primary'), button('신청 반려', () => command('review', row, { decision: 'reject' }, reason, `${row.display_name} 학생의 신청을 반려할까요?`), 'danger'));
+        }, 'primary'), briefButton('반려', `${row.display_name} 학생의 신청 반려`, () => command('review', row, { decision: 'reject' }, reason, `${row.display_name} 학생의 신청을 반려할까요?`), 'danger'));
         const tr = personRow(row);
         tr.append(rosterCell, cell(reason), cell(actions), cell(historyDisclosure(row.user_id, audit)));
         body.appendChild(tr);
@@ -215,6 +224,13 @@
     function students(rows, total = rows.length, audit = []) {
       const section = el('section', undefined, 'academy-card'); section.appendChild(el('h3', `수강생 관리 (${total})`));
       const statuses = { active: '이용 가능', suspended: '이용 정지', revoked: '이용 해지' };
+      // 짧은 이름은 표에, 긴 뜻은 title·aria-label 에. 조사는 붙여 만들지 않는다 —
+      // 「이용 가능」 + 「로 변경」 이 「이용 가능로 변경」이 됐다.
+      const STATUS_CHANGE = {
+        active: { short: '재개', full: '이용 가능으로 변경' },
+        suspended: { short: '정지', full: '이용 정지로 변경' },
+        revoked: { short: '해지', full: '이용 해지로 변경' }
+      };
       const { scroll, body } = personTable(['상태', '기수 변경', '변경 사유', '관리', '최근 이력']);
       let sortField = '';
       let sortDirection = 'asc';
@@ -237,14 +253,15 @@
           rosterSelect.setAttribute('aria-label', `${row.display_name} 현재 기수로 사용할 등록 명단`);
           reason.setAttribute('aria-label', `${row.display_name} 변경 사유`);
           const assign = el('div', undefined, 'actions');
-          assign.append(rosterSelect, button('현재 기수 변경', () => {
+          assign.append(rosterSelect, briefButton('변경', `${row.display_name} 학생의 현재 기수 변경`, () => {
             if (!rosterSelect.value) { message('이 학생과 일치하는 기수 명단을 선택해주세요.', true); rosterSelect.focus(); return; }
             return command('assign', row, { roster_entry_id: Number(rosterSelect.value) }, reason, `${row.display_name} 학생의 현재 기수를 ${rosterSelect.selectedOptions[0].textContent}(으)로 바꿀까요?`);
           }, 'primary'));
           const actions = el('div', undefined, 'actions');
           for (const [value, label] of Object.entries(statuses)) {
             if (row.status === value) continue;
-            actions.appendChild(button(label + '로 변경', () => command('set_status', row, { status: value }, reason, `${row.display_name} 학생을 ${label} 상태로 바꿀까요?`), value === 'active' ? 'primary' : value === 'revoked' ? 'danger' : 'outline'));
+            // ★조사는 붙여 만들지 않는다 — 「이용 가능」 + 「로 변경」 이 「이용 가능로 변경」이 됐다.
+            actions.appendChild(briefButton(STATUS_CHANGE[value].short, `${row.display_name} 학생 ${STATUS_CHANGE[value].full}`, () => command('set_status', row, { status: value }, reason, `${row.display_name} 학생을 ${label} 상태로 바꿀까요?`), value === 'active' ? 'primary' : value === 'revoked' ? 'danger' : 'outline'));
           }
           const tr = personRow(row);
           tr.append(

@@ -94,7 +94,7 @@
 
 /* ★수강생·가입 신청은 다른 탭들과 같은 **표**다 — 한 사람 = 한 줄 (사용자 2026-09-14).
    앞 네 칸의 순서는 어느 표에서나 같다: 이메일 · 성함 · 끝 4자리 · 기수. */
-.academy-admin .academy-table { width: 100%; border-collapse: collapse; min-width: 1180px; }
+.academy-admin .academy-table { width: 100%; border-collapse: collapse; }
 .academy-admin .academy-table td { vertical-align: middle; }
 .academy-admin .academy-table th,
 .academy-admin .academy-table td { white-space: nowrap; }
@@ -103,9 +103,15 @@
 .academy-admin .academy-cell-cohort { color: var(--text2, #b0b0b0); font-size: 13px; }
 .academy-admin .academy-table .actions { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
 /* 칸 안의 입력은 제 몫만 차지한다 — 기본값 width:100% 면 칸이 끝없이 넓어진다. */
+/* 칸 안의 입력은 **정해진 폭**을 쓴다. width:auto 로 두면 <select> 는 가장 긴 보기
+   (「유유스 1기 · 홍길동 · hong@gmail.com」)에, <input> 은 안내 문구 길이에 맞춰 커져
+   표가 1711px 이 됐다 — 보이는 폭 1189px 를 522px 넘겨 관리 칸이 잘렸다 (2026-09-14). */
 .academy-admin .academy-table select,
-.academy-admin .academy-table input[type="text"] { width: auto; min-width: 0; max-width: 210px; }
-.academy-admin .academy-table .academy-notice { margin: 4px 0 0; font-size: 12px; white-space: normal; }
+.academy-admin .academy-table input[type="text"] { width: 130px; min-width: 0; max-width: 130px; padding: 8px 10px; }
+/* 칸이 아홉이라 좌우 여백 3px 씩만 줄여도 27px 이 돌아온다. */
+.academy-admin .academy-table th,
+.academy-admin .academy-table td { padding-left: 9px; padding-right: 9px; }
+.academy-admin .academy-table .academy-notice { max-width: 200px; margin: 4px 0 0; font-size: 12px; white-space: normal; }
 /* 접기를 칸 안에 넣으면 기본 여백·테두리·44px 높이가 줄을 하나 더 만든다. */
 .academy-admin .academy-table .academy-disclosure { margin-top: 0; border-top: 0; }
 .academy-admin .academy-table .academy-disclosure summary { min-height: 0; padding: 2px 22px 2px 0; }
