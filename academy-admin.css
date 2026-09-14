@@ -68,6 +68,15 @@
 .academy-admin .academy-record { padding: 16px 0; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-record:last-child { padding-bottom: 0; }
 .academy-admin .academy-record p { color: var(--text2, #b0b0b0); font-size: 13px; }
+/* ★수강생 한 명 = 한 줄. 아이디 · 이름 · 끝 4자리 · 기수 · 상태 (사용자 2026-09-14).
+   가운뎃점은 CSS 가 그린다 — 글자에 박아 두면 한 칸이 비었을 때 점만 덩그러니 남는다. */
+.academy-admin .academy-record-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0; font-size: 14px; font-weight: 400; line-height: 1.5; }
+.academy-admin .academy-record-line > span + span::before { content: '·'; margin-right: 8px; color: var(--text3, #6a6a6a); }
+.academy-admin .academy-record-id { font-weight: 600; color: var(--text, #e8e8e8); overflow-wrap: anywhere; }
+.academy-admin .academy-record-name { color: var(--text, #e8e8e8); }
+.academy-admin .academy-record-phone,
+.academy-admin .academy-record-cohort { color: var(--text2, #b0b0b0); font-size: 13px; }
+.academy-admin .academy-record-status { color: var(--accent, #ffd700); font-size: 13px; }
 .academy-admin .academy-disclosure { margin-top: 8px; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-disclosure summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 28px 8px 0; position: relative; cursor: pointer; color: var(--text2, #b0b0b0); font-size: 13px; font-weight: 600; list-style: none; }
 .academy-admin .academy-disclosure summary::-webkit-details-marker { display: none; }

@@ -109,9 +109,21 @@
     function command(action, row, values, reason, confirmation) {
       return mutate(action, { user_id: row.user_id, revision: row.revision, ...values }, reason, confirmation);
     }
-    function record(row, headingTag = 'h4') {
+    // ★한 사람은 **한 줄**이다. 예전엔 이름 / Gmail·휴대폰 / 상태·기수 를 세 줄로 쌓아
+    //   수강생 한 명이 화면 세 줄을 먹었고, 기수가 맨 아랫줄에 섞여 훑어보기가 안 됐다
+    //   (사용자 2026-09-14). 순서는 에디터 회원 표와 같게 맞춘다 —
+    //   아이디(Gmail) · 이름 · 휴대폰 끝 4자리 · 기수.
+    function record(row, headingTag = 'h4', extras = []) {
       const section = el('article', undefined, 'academy-record');
-      section.append(el(headingTag, row.display_name), el('p', `${row.canonical_gmail} · 휴대폰 끝 ${row.phone_last_four}`));
+      const line = el(headingTag, undefined, 'academy-record-line');
+      line.append(
+        el('span', row.canonical_gmail, 'academy-record-id'),
+        el('span', row.display_name, 'academy-record-name'),
+        el('span', `끝 ${row.phone_last_four}`, 'academy-record-phone'),
+        el('span', row.cohort_name || '기수 없음', 'academy-record-cohort'),
+        ...extras
+      );
+      section.append(line);
       return section;
     }
     function disclosure(label, children, meta) {
@@ -202,9 +214,10 @@
         list.replaceChildren();
         for (const row of visible) {
           const candidates = Array.isArray(row.roster_options) ? row.roster_options : [];
-          const card = record(row), rosterSelect = rosterField(candidates), reason = reasonField();
+          // 상태도 같은 줄에 붙인다 — 기수는 record 가 이미 그 줄에 넣는다.
+          const statusChip = el('span', statuses[row.status] || '운영 확인 필요', 'academy-record-status');
+          const card = record(row, 'h4', [statusChip]), rosterSelect = rosterField(candidates), reason = reasonField();
           const fields = el('div', undefined, 'academy-fields');
-          card.appendChild(el('p', `${statuses[row.status] || '운영 확인 필요'} · 현재 기수 ${row.cohort_name || '없음'}`));
           fields.append(field('현재 기수로 사용할 등록 명단', rosterSelect), field('변경 사유', reason));
           const actions = el('div', undefined, 'academy-actions');
           actions.append(button('현재 기수 변경', () => {

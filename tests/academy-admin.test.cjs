@@ -231,10 +231,19 @@ test('sorting stays inside student management and the page-wide search toolbar i
   assert.doesNotMatch(textOf(root),/현재 페이지 목록 찾기|현재 페이지 관리 목록 검색|검색 지우기/);
   const studentSection=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 관리 (2)'));
   assert.match(textOf(studentSection),/수강생 정렬.*이름.*Gmail.*기수.*상태/);
+  // ★한 사람은 한 줄이고 칸 순서는 아이디 · 이름 · 끝 4자리 · 기수 · 상태 다 (사용자 2026-09-14).
+  //   예전엔 이름만 든 h4 를 읽었다 — 세 줄로 쌓여 있어 그게 가능했다.
+  const lines=()=>studentSection.querySelectorAll('article').map(node=>textOf(node.children[0]).trim().replace(/\s+/g,' '));
+  const 가='alpha@gmail.com 가 학생 끝 1111 유유스 1기 이용 가능';
+  const 나='beta@gmail.com 나 학생 끝 2222 유유스 2기 이용 정지';
   await findButton(studentSection,'이름').events.click();
-  assert.deepEqual(studentSection.querySelectorAll('article').map(node=>node.children[0].textContent),['가 학생','나 학생']);
+  assert.deepEqual(lines(),[가,나]);
   await findButton(studentSection,'이름 ↑').events.click();
-  assert.deepEqual(studentSection.querySelectorAll('article').map(node=>node.children[0].textContent),['나 학생','가 학생']);
+  assert.deepEqual(lines(),[나,가]);
+  // 한 줄인지는 줄을 만드는 h4 하나뿐인지로 본다 — <p> 가 다시 생기면 또 쌓인다.
+  const first=studentSection.querySelectorAll('article')[0];
+  assert.equal(first.children.filter(c=>c.tagName==='p').length,0,'카드 본문에 <p> 줄을 다시 만들면 안 된다');
+  assert.equal(String(first.children[0].attrs.class||first.children[0].className||''),'academy-record-line');
   assert.doesNotMatch(textOf(root),/선택 승인|선택 정지|일괄 승인/);
 });
 test('roster and cohort management use separate clear cards while cohort access stays explicit',async()=>{
