@@ -459,20 +459,34 @@
       const fields = el('div', undefined, 'academy-fields');
       fields.append(field('기수', cohort), field('이름', name), field('휴대폰 끝 4자리', phone),
                     field('Gmail 아이디 (선택)', gmail), field('등록 사유', reason));
+      // ★막힌 까닭은 **단추 옆에서** 말한다. 예전에는 화면 맨 위 회색 문구로만 떠서
+      //   단추에서 318px 위였다 — 누르면 아무 일도 안 난 것처럼 보였다 (사용자 2026-09-14:
+      //   「하나 수강명단에 추가해보려고 했는데 실제로는 안들어가는데?」. 기록을 보니
+      //   그 시도는 서버까지 온 적이 없었다).
+      const note = el('p', '', 'academy-bulk-note');
+      const stop = (text, target) => {
+        message(text, true);
+        note.textContent = text;
+        note.className = 'academy-bulk-note academy-add-stop';
+        if (target) target.focus();
+      };
+      const clearNote = () => { note.textContent = ''; note.className = 'academy-bulk-note'; };
       const addAction = button('수강 명단에 추가', () => {
         const gmailLocal = gmail.value.trim().toLowerCase();
-        if (!cohort.value) { message('기수를 선택해주세요.', true); cohort.focus(); return; }
-        if (name.value.trim().length < 2) { message('수강생 이름을 2자 이상 입력해주세요.', true); name.focus(); return; }
+        if (!cohort.value) { stop('기수를 선택해주세요.', cohort); return; }
+        if (name.value.trim().length < 2) { stop('수강생 이름을 2자 이상 입력해주세요.', name); return; }
         if (gmailLocal && !/^[a-z0-9]+([.][a-z0-9]+)*([+][a-z0-9._-]+)?$/.test(gmailLocal)) {
-          message('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요. 모르면 비워 두세요.', true); gmail.focus(); return; }
-        if (!/^[0-9]{4}$/.test(phone.value)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.', true); phone.focus(); return; }
+          stop('@gmail.com 앞의 Gmail 아이디만 정확히 입력해주세요. 모르면 비워 두세요.', gmail); return; }
+        if (!/^[0-9]{4}$/.test(phone.value)) { stop('휴대폰 끝 4자리를 숫자로 입력해주세요.', phone); return; }
+        // 칸 이름은 「등록 사유」인데 mutate 는 「변경 사유」라고 달리 말했다 — 여기서 먼저 잡는다.
+        if (!reason.value.trim()) { stop('등록 사유를 입력해주세요. 무엇을 보고 넣는지 한 줄이면 됩니다.', reason); return; }
+        clearNote();
         return mutate('roster_add', { cohort_id: Number(cohort.value), display_name: name.value.trim(),
           gmail_local_id: gmailLocal, phone_last_four: phone.value, source_reference: '' }, reason,
           name.value.trim() + ' 학생을 ' + cohort.selectedOptions[0].textContent + ' 명단에 추가할까요?');
       }, 'primary');
 
       // ── 엑셀로 여러 명. 초록은 되돌릴 수 있는 보조 작업 — UV 에디터 탭과 같은 규칙이다. ──
-      const note = el('p', '', 'academy-bulk-note');
       const template = button('엑셀 양식 받기', () => {
         const rows = open.length
           ? open.slice(0, 3).map(c => ({ '이름': '홍길동', '휴대폰 끝 4자리': '0402', '기수': c.name }))
@@ -502,7 +516,9 @@
               (bad.length ? ' 건너뛸 ' + bad.length + '줄: ' +
                 bad.slice(0, 3).map(r => (r.display_name || '(이름 없음)') + ' — ' + r.problem).join(' / ') +
                 (bad.length > 3 ? ' 외' : '') : '');
-          if (good.length) await bulkRosterAdd(good, reason);
+          if (!good.length) return;
+          if (!reason.value.trim()) { stop('등록 사유를 입력해주세요. 엑셀로 올릴 때도 필요합니다.', reason); return; }
+          await bulkRosterAdd(good, reason);
         } catch (error) {
           void error;
           note.textContent = '엑셀을 읽지 못했습니다. 양식을 받아 그대로 채워주세요.';

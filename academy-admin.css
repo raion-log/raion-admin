@@ -123,6 +123,7 @@
 .academy-admin .academy-setup > .academy-card { margin-bottom: 0; }
 .academy-admin .academy-add-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .academy-admin .academy-file-input { display: none; }
+.academy-admin .academy-add-stop { color: #ff8da1; font-weight: 600; }
 .academy-admin .academy-bulk-note { margin: 8px 0 0; color: var(--text2, #b0b0b0); font-size: 12.5px; }
 
 @media (max-width: 1180px) {

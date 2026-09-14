@@ -235,6 +235,35 @@ test('the Excel roster reads name, last four and cohort — and says what it wil
   assert.match(parse(cohorts,{'이름':'홍길동','휴대폰 끝 4자리':'0402','기수':'유유스 9기'}).problem,/명단을 받지 않습니다/);
   assert.match(parse(cohorts,{'이름':'','휴대폰 끝 4자리':'0402','기수':'2기'}).problem,/이름이 비었습니다/);
 });
+test('a blocked add says why next to the button, not only at the top of the page',async()=>{
+  // ★2026-09-14 실사고: 사유를 비운 채 누르면 화면 맨 위 회색 문구로만 떠서 단추에서 318px
+  //   위였다. 「눌렀는데 아무 일도 안 난다」로 보였고, 그 시도는 서버까지 온 적이 없었다.
+  //   칸 이름은 「등록 사유」인데 오류는 「변경 사유」라고 달리 말하기까지 했다.
+  const calls=[];
+  const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    if(args.action==='admin_snapshot') return {data:{...copy,cohorts:[cohort]}};
+    return {data:{ok:true}};
+  });
+  await admin.load();
+  const direct=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-direct-add'));
+  const select=direct.querySelectorAll('select')[0]; select.value='1'; select.selectedOptions=[{textContent:'유유스 1기'}];
+  const inputs=direct.querySelectorAll('input');
+  inputs.find(node=>node.placeholder==='수강생 이름').value='시험학생';
+  inputs.find(node=>node.placeholder==='끝 4자리').value='0402';
+  // 등록 사유를 비운 채로 누른다.
+  await findButton(direct,'수강 명단에 추가').events.click();
+  assert.equal(calls.filter(c=>c.action==='roster_add').length,0,'막혔으면 서버로 보내지 않는다');
+  const note=direct.querySelectorAll('p').find(node=>String(node.className).includes('academy-add-stop'));
+  assert.ok(note,'까닭은 카드 안에서도 보여야 한다 — 맨 위 문구만으로는 못 본다');
+  assert.match(note.textContent,/등록 사유/,'칸 이름과 같은 말을 쓴다');
+  assert.doesNotMatch(note.textContent,/변경 사유/);
+  // 채우면 통과한다.
+  inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='명단 대조';
+  await findButton(direct,'수강 명단에 추가').events.click();
+  assert.equal(calls.filter(c=>c.action==='roster_add').length,1);
+});
 test('current roster stays prominent while cancelled and internal reference records stay secondary',async()=>{
   const roster=[
     {id:2,revision:1,user_id:null,display_name:'현재 학생',canonical_gmail:'current@gmail.com',phone_last_four:'0402',cohort_name:'유유스 1기',status:'eligible',source_reference:'INTERNAL-CURRENT'},
