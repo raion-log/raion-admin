@@ -184,6 +184,22 @@ test('row action buttons sit on one line, at the same height as the rest of the 
   assert.doesNotMatch(source, /style="margin-top:3px;" onclick="deleteEditorMember/);
 });
 
+test('a member row is one line — the 연장 controls sit beside the date, not under it', () => {
+  // 유효기간 칸이 「날짜+뱃지」 아래에 <div> 로 「1 개월 연장」을 쌓아, 회원 행이 전부
+  // 두 줄이 됐다. 세로만 두 배로 먹고 얻는 것이 없었다 (사용자 2026-09-14).
+  // 실측: 행 높이 83px → 57px, 표 폭은 1632px 그대로.
+  const cell = source.match(/<div class="ed-valid-cell">[\s\S]*?<\/div>/)[0];
+  for (const part of ['type="date"', 'class="badge', 'ed-ext-dur-', 'ed-ext-unit-', '>연장</button>']) {
+    assert.ok(cell.includes(part), `유효기간 칸 한 줄 안에 ${part} 가 있어야 한다`);
+  }
+  // 그 한 줄 안에 또 다른 <div> 가 생기면 다시 쌓인다.
+  const inner = cell.replace(/^<div class="ed-valid-cell">/, '');
+  assert.doesNotMatch(inner, /<div/, '칸 안에 중첩 div 를 두면 다시 두 줄이 된다');
+  assert.match(source, /\.ed-valid-cell \{ display: flex;[^}]*white-space: nowrap;/);
+  // 모자란 폭은 줄을 늘려 메우지 않고 표를 가로로 민다.
+  assert.match(source, /\.table-scroll \{[^}]*overflow-x: auto;/);
+});
+
 test('the Excel buttons sit beside 명단에 올리기, not on their own row', () => {
   const row = source.match(/<button class="btn btn-primary" id="ed-pre-submit"[\s\S]{0,900}?<\/div>/)[0];
   assert.match(row, /ed-pre-excel/, '같은 form-row 안에 있어야 한다');
