@@ -643,7 +643,7 @@
             </div>
             <div class="form-group">
               <label for="ed-add-phone">연락처 끝 4자리</label>
-              <input type="text" id="ed-add-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off">
+              <input type="text" id="ed-add-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off" data-four-digits>
             </div>
             <div class="form-group">
               <label for="ed-add-cohort">기수</label>
@@ -688,7 +688,7 @@
             </div>
             <div class="form-group">
               <label for="ed-pre-phone">연락처 끝 4자리 (필수)</label>
-              <input type="text" id="ed-pre-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off" required>
+              <input type="text" id="ed-pre-phone" placeholder="1234" inputmode="numeric" maxlength="4" style="width:100px;" autocomplete="off" required data-four-digits>
             </div>
             <div class="form-group">
               <label for="ed-pre-cohort">기수</label>
@@ -2321,10 +2321,40 @@
         onchange="updateEditorMember('${m.id}', { name: this.value.trim() || null })">`;
     }
     function edPhoneInput(m) {
-      return `<input type="text" value="${edEsc(m.phone_last4 || '')}" placeholder="끝4자리" maxlength="4"
+      return `<input type="text" value="${edEsc(m.phone_last4 || '')}" placeholder="끝4자리" maxlength="4" inputmode="numeric" data-four-digits
         style="${edInput()}width:58px;text-align:center;"
         onchange="updateEditorMember('${m.id}', { phone_last4: this.value.trim() || null })">`;
     }
+
+    // ★연락처 끝 4자리 칸은 숫자 네 자리 말고는 아예 받지 않는다 (사용자 2026-09-14: 「무조건 4자리만 —
+    //   아예 실수할 여지를 안주는거지」). 성함과 함께 명단을 맞추는 열쇠라 틀리면 자동 승인이 안 된다.
+    //   표 안의 칸은 다시 그려지므로 칸마다 묶지 않고 문서 한 곳에서 data-four-digits 를 받는다.
+    //   · 숫자 아닌 글자는 즉시 지운다(한글 조합 중에는 조합이 끝나면)  · 네 자리까지만
+    //   · 전화번호를 통째로 붙여넣으면 끝 4자리만 — maxlength 에 맡기면 「010-」이 된다
+    // 값이 달라질 때만 고쳐 쓴다 — 멀쩡히 친 숫자까지 매번 다시 넣으면 표 칸의 change(저장)가 안 생길 수 있다.
+    function edKeepFourDigits(el) {
+      const kept = String(el.value || '').replace(/\D/g, '').slice(0, 4);
+      if (el.value !== kept) el.value = kept;
+    }
+    document.addEventListener('input', (e) => {
+      if (e.target?.matches?.('[data-four-digits]') && !e.isComposing) edKeepFourDigits(e.target);
+    });
+    document.addEventListener('compositionend', (e) => {
+      if (e.target?.matches?.('[data-four-digits]')) edKeepFourDigits(e.target);
+    });
+    document.addEventListener('paste', (e) => {
+      if (!e.target?.matches?.('[data-four-digits]')) return;
+      const digits = String(e.clipboardData?.getData('text') ?? '').replace(/\D/g, '');
+      if (!digits) return;
+      e.preventDefault();
+      const kept = digits.slice(-4);
+      if (e.target.value === kept) return;
+      e.target.value = kept;
+      // ★표 안의 칸은 change 로 저장한다. 그런데 JS 가 값을 넣으면 Chrome 은 칸을 벗어나도 change 를
+      //   쏘지 않는다 — 진짜 Chrome 실측: 대기 표 칸에 붙여넣고 벗어나도 저장 0건이었다. 직접 알린다.
+      e.target.dispatchEvent(new Event('input', { bubbles: true }));
+      e.target.dispatchEvent(new Event('change', { bubbles: true }));
+    });
 
     // ── 선택 상태 (두 목록이 각자 보유) ──
     const edSel = { pending: new Set(), member: new Set() };

@@ -148,6 +148,22 @@ test('the Excel template example row is never uploaded as a real pre-approval', 
   assert.match(template, /'유형': '수강생'/);
 });
 
+test('every last-four field accepts nothing but four digits, and a paste into a table cell still saves', () => {
+  // 사용자 2026-09-14: 「무조건 4자리만 넣을 수 있게 — 아예 실수할 여지를 안주는거지」.
+  assert.match(source, /id="ed-add-phone"[^>]*data-four-digits/);
+  assert.match(source, /id="ed-pre-phone"[^>]*data-four-digits/);
+  assert.match(source, /function edPhoneInput\(m\) \{\s*return `<input[^`]*data-four-digits/);
+  // Letters go the moment they arrive (but not mid-composition), and only four digits stay.
+  assert.match(source, /if \(e\.target\?\.matches\?\.\('\[data-four-digits\]'\) && !e\.isComposing\) edKeepFourDigits\(e\.target\)/);
+  assert.match(source, /document\.addEventListener\('compositionend'/);
+  assert.match(source, /replace\(\/\\D\/g, ''\)\.slice\(0, 4\)/);
+  // A pasted phone number keeps its last four — maxlength alone would cut it to 「010-」.
+  assert.match(source, /const kept = digits\.slice\(-4\);/);
+  // ★Real Chrome: a value set by JS does not fire change on blur, so a paste into the pending-table cell
+  //   saved nothing until the handler announced it.
+  assert.match(source, /e\.target\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\);/);
+});
+
 test('the pre-approval form takes no e-mail and the lists never show the English type', () => {
   const card = source.slice(source.indexOf('<!-- 가입 전 미리 승인 -->'), source.indexOf('id="ed-pre-tbody"'));
   assert.doesNotMatch(card, /id="ed-pre-email"/, '이메일 칸이 없어야 한다');
