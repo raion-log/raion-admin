@@ -291,12 +291,15 @@ test('only a cancelled roster row that never had an account can be deleted, and 
 
   findButton(rowOf('지울 학생'),'삭제').events.click();
   assert.equal(findButton(rowOf('지울 학생'),'삭제').attrs['aria-expanded'],'true');
-  // 사유를 비우면 보내지 않는다.
+  // 사유를 비우면 보내지 않고, 까닭을 **그 판 안에서** 칸 이름 그대로 말한다.
   await findButton(list,'영구 삭제').events.click();
   assert.equal(calls.filter(c=>c.action==='roster_delete').length,0);
   // 한 표 안에 수정·취소·삭제 사유 칸이 여럿이다 — 삭제 판을 id 로 집는다.
   const panel=list.querySelectorAll('div').find(node=>node.id==='academy-roster-delete-31');
   assert.equal(panel.hidden,false,'삭제 판이 열려 있어야 한다');
+  const stop=panel.querySelectorAll('p').find(node=>String(node.className).includes('academy-add-stop'));
+  assert.ok(stop,'까닭이 판 안에 보여야 한다 — 맨 위 문구만으로는 못 본다');
+  assert.equal(stop.textContent,'삭제 사유를 입력해주세요.');
   panel.querySelectorAll('input')[0].value='잘못 넣은 명단';
   await findButton(list,'영구 삭제').events.click();
   const sent=calls.filter(c=>c.action==='roster_delete');

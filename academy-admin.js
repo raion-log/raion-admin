@@ -84,6 +84,9 @@
     function field(label, input) {
       const wrapper = el('label', input.required ? `${label} (필수)` : label);
       wrapper.appendChild(input);
+      // 막힌 까닭을 이 칸 바로 아래에서 말하려고, 칸이 자기 이름과 자리를 기억한다.
+      input.fieldLabel = label;
+      input.fieldWrapper = wrapper;
       return wrapper;
     }
     function reasonField() {
@@ -105,7 +108,20 @@
     }
     async function mutate(action, values, reason, confirmation) {
       if (busy) return;
-      if (!reason.value.trim()) { message('변경 사유를 입력해주세요.', true); reason.focus(); return; }
+      // ★사유가 비면 까닭을 **그 칸 바로 아래**에서도 말한다. 맨 위 문구만으로는 판에서
+      //   멀어 「눌렀는데 아무 일도 안 난다」로 보였다 (사용자 2026-09-14). 칸 이름도 그대로 쓴다 —
+      //   「삭제 사유」 칸에 「변경 사유를 입력해주세요」라고 달리 말하지 않게.
+      const wrap = reason.fieldWrapper;
+      if (!reason.value.trim()) {
+        const text = (reason.fieldLabel || '변경 사유') + '를 입력해주세요.';
+        message(text, true);
+        if (wrap) {
+          if (!wrap.stopNote) { wrap.stopNote = el('p', '', 'academy-bulk-note academy-add-stop'); wrap.appendChild(wrap.stopNote); }
+          wrap.stopNote.textContent = text;
+        }
+        reason.focus(); return;
+      }
+      if (wrap?.stopNote) wrap.stopNote.textContent = '';
       if (!global.confirm(confirmation + '\n변경은 학습실에만 적용됩니다.')) return;
       busy = true; disabled(true); message('처리 중입니다. 창을 닫지 마세요.');
       const token = epoch;
