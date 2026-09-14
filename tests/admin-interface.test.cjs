@@ -128,6 +128,8 @@ test('the device cell folds to one line and a cleared date is not shown as harml
   assert.match(source, /if \(mode === 'expired'\)  return d === null \|\| d < 0;/);
   // The inline device limit used to send NaN/0/99 straight to the table.
   assert.match(source, /onchange="setEditorMaxDevices\('\$\{m\.id\}', this\)"/);
+  // The start date wrapped to 「2026. 8. / 5.」 (real Chrome: 2 text lines -> 1 after nowrap).
+  assert.match(source, /<td style="font-size:11px;color:var\(--text3\);white-space:nowrap;">\$\{startDate\}<\/td>/);
 });
 
 test('the Excel template example row is never uploaded as a real pre-approval', () => {

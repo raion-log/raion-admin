@@ -2997,7 +2997,7 @@
           <td>${edCohortSelect(m)}</td>
           <td>${edTypeSelect(m)}</td>
           <td><span class="badge ${statusClass}">${statusText}</span></td>
-          <td style="font-size:11px;color:var(--text3);">${startDate}</td>
+          <td style="font-size:11px;color:var(--text3);white-space:nowrap;">${startDate}</td>
           <td>
             <div class="ed-valid-cell">
               <input type="date" value="${vuDate}" style="${st}" onchange="setEditorValidUntil('${m.id}', this.value)">
