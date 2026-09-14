@@ -6,6 +6,8 @@
     let busy = false;
     let pageOffset = 0;
     let rosterCohortFilter = 'all';
+    // 조회어도 화면을 다시 그려도 살아 있어야 한다 — 기수 고름과 같은 자리에 둔다.
+    let rosterSearch = '';
     const el = (tag, text, className) => {
       const node = document.createElement(tag);
       if (text !== undefined) node.textContent = String(text ?? '');
@@ -340,7 +342,7 @@
     function stateBadge(label, current = false) {
       return el('span', label, `academy-state ${current ? 'academy-state-open' : 'academy-state-closed'}`);
     }
-    function cohortManagement(rows) {
+    function cohortManagement(rows, rosterRows = [], onPick) {
       const section = el('section', undefined, 'academy-card academy-cohort-management');
       section.append(
         el('h3', '기수 관리'),
@@ -360,19 +362,33 @@
       section.appendChild(disclosure('새 기수 추가', [el('p', '새 기수는 수강생 입장이 닫힌 상태로 만들어집니다.', 'academy-notice'), fields, createAction]));
       const cohortList=el('div',undefined,'academy-cohort-list');
       if(!rows.length) cohortList.appendChild(el('p','등록된 기수가 없습니다. 새 기수를 먼저 추가해주세요.','academy-empty-copy'));
+      // ★기수를 고르면 오른쪽 명단이 그 기수만 보인다 — 기수를 한 군데서만 고르게
+      //   하려고 「기수별 보기」 드롭다운은 없앴다 (사용자 2026-09-14).
+      const countOf = (cohort) => rosterRows.filter(entry =>
+        entry.status !== 'cancelled' &&
+        (String(entry.cohort_id ?? '') === String(cohort.id) || entry.cohort_name === cohort.name)).length;
       for(const row of rows) {
         const card=el('article',undefined,'academy-cohort-card');
+        if(String(row.id)===rosterCohortFilter) card.className+=' academy-cohort-picked';
         const isOpen=row.status==='active';
         const access=cohortAccess(row);
         const numberLabel=`${row.cohort_number}기`;
         const heading=String(row.name).includes(numberLabel) ? row.name : `${numberLabel} · ${row.name}`;
         const cardHeading=el('div',undefined,'academy-record-heading');
+        const picked=String(row.id)===rosterCohortFilter;
+        const pick=button(`${countOf(row)}명 명단 보기`,()=>{
+          rosterCohortFilter = picked ? 'all' : String(row.id);
+          rosterSearch='';
+          onPick?.();
+        },picked ? 'primary' : 'outline');
+        pick.setAttribute('aria-pressed',String(picked));
+        pick.setAttribute('aria-label',`${row.name} 명단 ${picked ? '접기' : '보기'}`);
         cardHeading.append(el('h5',heading),stateBadge(access.label,access.current));
         const meta=el('dl',undefined,'academy-cohort-meta');
         meta.append(
           metaItem('운영 기간',`${row.starts_on || '시작일 미정'} ~ ${row.ends_on || '종료일 미정'}`)
         );
-        card.append(cardHeading,meta);
+        card.append(cardHeading,meta,pick);
         const changeReason=reasonField();
         const actionLabel=isOpen ? '입장 닫기' : '입장 열기';
         const targetStatus=isOpen ? 'completed' : 'active';
@@ -535,31 +551,32 @@
       if (rosterCohortFilter !== 'all' && !cohortIds.has(rosterCohortFilter)) rosterCohortFilter = 'all';
       const cohortIdOf = row => String(row.cohort_id ?? cohorts.find(cohort => cohort.name === row.cohort_name)?.id ?? '');
       const visibleRows = rosterCohortFilter === 'all' ? rows : rows.filter(row => cohortIdOf(row) === rosterCohortFilter);
-      const currentRows=visibleRows.filter(row=>row.status!=='cancelled');
-      const cancelledRows=visibleRows.filter(row=>row.status==='cancelled');
+      const needle=rosterSearch.trim().toLowerCase();
+      const hit=row=>!needle
+        || String(row.display_name||'').toLowerCase().includes(needle)
+        || String(row.phone_last_four||'').includes(needle)
+        || String(row.canonical_gmail||'').toLowerCase().includes(needle);
+      const foundRows=visibleRows.filter(hit);
+      const currentRows=foundRows.filter(row=>row.status!=='cancelled');
+      const cancelledRows=foundRows.filter(row=>row.status==='cancelled');
       const section=el('section',undefined,'academy-management-group academy-roster-management');
-      const heading=managementHeading('등록 명단','기수를 골라 명단을 확인하고, 가입 전 행은 오른쪽에서 바로 수정하거나 취소합니다.');
-      const controls=el('div',undefined,'academy-roster-controls');
-      const cohortFilter=el('select');
-      cohortFilter.setAttribute('aria-label','등록 명단 기수 선택');
-      const activeCount = source => source.filter(row=>row.status!=='cancelled').length;
+      // 기수는 **왼쪽 기수 관리에서** 고른다. 여기서는 무엇을 보고 있는지만 말한다.
+      const pickedCohort=cohorts.find(cohort=>String(cohort.id)===rosterCohortFilter);
       const pageLimited=total>rows.length;
-      const allOption=el('option',`${pageLimited ? '현재 페이지 전체' : '전체 기수'} · ${activeCount(rows)}명`); allOption.value='all';
-      cohortFilter.appendChild(allOption);
-      for(const cohort of [...cohorts].sort((a,b)=>Number(a.cohort_number)-Number(b.cohort_number))) {
-        const cohortRows=rows.filter(row=>cohortIdOf(row)===String(cohort.id));
-        const option=el('option',`${cohort.name} · ${activeCount(cohortRows)}명`);
-        option.value=String(cohort.id);
-        cohortFilter.appendChild(option);
-      }
-      cohortFilter.value=rosterCohortFilter;
-      cohortFilter.addEventListener('change',()=>{
-        rosterCohortFilter=cohortFilter.value;
-        onFilterChange?.();
-      });
-      const filterLabel=el('label','기수별 보기','academy-roster-filter');
-      filterLabel.appendChild(cohortFilter);
-      controls.append(filterLabel,countBadge(`${currentRows.length}명${pageLimited ? ' 표시' : ''}`));
+      const heading=managementHeading(
+        pickedCohort ? `등록 명단 · ${pickedCohort.name}` : '등록 명단',
+        pickedCohort
+          ? '가입 전 행은 오른쪽에서 바로 고치거나 취소합니다. 왼쪽 기수를 다시 누르면 전체가 보입니다.'
+          : '왼쪽에서 기수를 누르면 그 기수 명단만 봅니다. 가입 전 행은 오른쪽에서 바로 고치거나 취소합니다.');
+      const controls=el('div',undefined,'academy-roster-controls');
+      // ★100명이 넘어도 찾을 수 있어야 한다 — 이름·끝 4자리로 거른다 (사용자 2026-09-14).
+      const search=input('search','이름 또는 끝 4자리');
+      search.value=rosterSearch;
+      search.setAttribute('aria-label','등록 명단에서 이름·끝 4자리로 찾기');
+      search.addEventListener('input',()=>{ rosterSearch=search.value; onFilterChange?.(); });
+      const searchLabel=el('label','찾기','academy-roster-filter');
+      searchLabel.appendChild(search);
+      controls.append(searchLabel,countBadge(`${currentRows.length}명${pageLimited ? ' 표시' : ''}`));
       heading.appendChild(controls);
       section.appendChild(heading);
       const labels={eligible:'가입 전',bound:'계정 연결됨',cancelled:'명단 취소'};
@@ -567,7 +584,8 @@
         const empty=el('div',undefined,'academy-empty-state');
         const copy=el('div');
         const cohortSelected=rosterCohortFilter!=='all';
-        copy.append(el('strong',cohortSelected ? '이 기수에 등록된 명단이 없습니다.' : '현재 사용할 수강 명단이 없습니다.'),el('p',cohortSelected ? '다른 기수를 선택하거나 위 수강생 추가에서 등록해주세요.' : '위 수강생 추가에서 명단을 등록할 수 있습니다.','academy-notice'));
+        if(needle) copy.append(el('strong',`「${rosterSearch.trim()}」에 맞는 명단이 없습니다.`),el('p','찾기 칸을 비우면 전체가 다시 보입니다.','academy-notice'));
+        else copy.append(el('strong',cohortSelected ? '이 기수에 등록된 명단이 없습니다.' : '현재 사용할 수강 명단이 없습니다.'),el('p',cohortSelected ? '왼쪽 기수를 다시 눌러 전체를 보거나, 위 수강생 추가에서 등록해주세요.' : '위 수강생 추가에서 명단을 등록할 수 있습니다.','academy-notice'));
         empty.appendChild(copy);
         if(focusDirectAdd) empty.appendChild(button('수강생 추가로 이동',focusDirectAdd));
         section.appendChild(empty);
@@ -590,15 +608,11 @@
         trigger.setAttribute('aria-expanded',String(opening));
         if(opening) panel.querySelectorAll('input, select')[0]?.focus();
       }
+      // ★한 사람은 한 줄이다. 수정·취소 입력은 그 줄 **바로 아래** 칸을 통째로 빌린다 —
+      //   예전에는 한 사람이 카드 세 줄이라 100명이면 화면이 300줄로 늘어졌다 (사용자 2026-09-14).
       function rosterRecord(row) {
-        const card=el('article',undefined,'academy-record academy-roster-record');
-        const rowLayout=el('div',undefined,'academy-roster-row');
-        const identity=el('div',undefined,'academy-roster-identity');
-        // Gmail 은 본인이 가입할 때 들어온다 — 비어 있으면 「null」이 아니라 그렇게 말한다.
-        identity.append(el('h5',row.display_name),el('p',`${row.canonical_gmail || 'Gmail 은 가입할 때 채워집니다'} · 휴대폰 끝 ${row.phone_last_four}`));
-        const rosterState=el('div',undefined,'academy-roster-state');
-        rosterState.append(stateBadge(labels[row.status] || row.status,row.status==='bound'),el('span',row.cohort_name));
-        identity.appendChild(rosterState);
+        const tr=el('tr',undefined,'academy-roster-record');
+        const identity=el('td',row.display_name,'academy-cell-id');
         const actions=el('div',undefined,'academy-roster-actions');
         const panels=[];
         if(row.status!=='bound') {
@@ -632,17 +646,36 @@
           actions.appendChild(cancelAction);
         }
         if(row.status==='bound') actions.appendChild(el('span','수강생 관리에서 변경','academy-roster-readonly'));
-        rowLayout.append(identity,actions);
-        card.replaceChildren(rowLayout,...panels.map(([,panel])=>panel));
-        return card;
+        tr.append(identity,
+          el('td',row.phone_last_four,'academy-cell-four'),
+          el('td',row.canonical_gmail || '가입할 때 채워집니다','academy-cell-cohort'),
+          el('td',row.cohort_name,'academy-cell-cohort'),
+          cell(stateBadge(labels[row.status] || row.status,row.status==='bound')),
+          cell(actions));
+        const panelRow=el('tr',undefined,'academy-roster-panel-row');
+        const panelCell=el('td'); panelCell.setAttribute('colspan','6');
+        panelCell.append(...panels.map(([,panel])=>panel));
+        panelRow.appendChild(panelCell);
+        return panels.length ? [tr,panelRow] : [tr];
       }
-      for(const row of currentRows) section.appendChild(rosterRecord(row));
+      const rosterTable=(source)=>{
+        const scroll=el('div',undefined,'table-scroll academy-roster-scroll');
+        scroll.setAttribute('tabindex','0');
+        const table=el('table',undefined,'academy-table academy-roster-table');
+        const head=el('thead'),headRow=el('tr');
+        for(const label of ['이름','끝 4자리','Gmail','기수','상태','관리']) headRow.appendChild(el('th',label));
+        head.appendChild(headRow);
+        const body=el('tbody');
+        for(const row of source) body.append(...rosterRecord(row));
+        table.append(head,body);
+        scroll.appendChild(table);
+        return scroll;
+      };
+      if(currentRows.length) section.appendChild(rosterTable(currentRows));
       if(cancelledRows.length) {
-        const cancelled=el('div');
-        for(const row of cancelledRows) cancelled.appendChild(rosterRecord(row));
-        section.appendChild(disclosure('취소된 명단', [cancelled], `${cancelledRows.length}건`));
+        section.appendChild(disclosure('취소된 명단', [rosterTable(cancelledRows)], `${cancelledRows.length}건`));
       }
-      section.focusFilter=()=>cohortFilter.focus();
+      section.focusFilter=()=>search.focus();
       return section;
     }
     function summary(data) {
@@ -704,7 +737,13 @@
         //   ② 요약 → ③ 가입 승인 대기(예외만 뜬다) → ④ 수강생 관리(일상) → ⑤ 페이지.
         //   예전에는 명단 관리가 맨 위, 기수 관리가 맨 아래여서 흐름이 거꾸로였다.
         const setup = el('div', undefined, 'academy-setup');
-        setup.append(cohortManagement(data.cohorts), management);
+        const cohortHost = el('div');
+        // 기수를 고르면 왼쪽(고른 표시)과 오른쪽(명단)을 함께 다시 그린다.
+        const renderPrep = () => {
+          cohortHost.replaceChildren(cohortManagement(data.cohorts, rosterPage, () => { renderPrep(); renderRoster(); }));
+        };
+        renderPrep();
+        setup.append(cohortHost, management);
         content.append(setup, summary(data),
           applications(data.applications, data.totals?.applications, data.audit),
           students(data.students, data.totals?.students, data.audit),

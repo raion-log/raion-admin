@@ -187,8 +187,11 @@ test('direct roster entry is the first academy work card and keeps account appro
   assert.equal(calls[1].payload.cohort_id,1);
   assert.equal(calls[1].payload.source_reference,'');
   assert.equal(calls[1].payload.reason,'신청서 대조');
-  const rosterFilter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
-  assert.equal(rosterFilter.value,'1');
+  // ★기수는 **왼쪽 기수 관리에서만** 고른다 — 같은 기수를 두 군데서 고르던 드롭다운은 없앴다
+  //   (사용자 2026-09-14). 새 명단을 저장하면 그 기수로 자동 전환되는 계약은 그대로다.
+  assert.equal(root.querySelectorAll('select').filter(node=>node.attrs['aria-label']==='등록 명단 기수 선택').length,0);
+  const picked=root.querySelectorAll('button').find(node=>node.attrs['aria-pressed']==='true');
+  assert.match(picked.attrs['aria-label'],/유유스 1기 명단 접기/);
   assert.doesNotMatch(textOf(direct),/외부 참조|주문\/신청 번호/);
 });
 test('a roster row can be added without a Gmail — name + last four + cohort is the key',async()=>{
@@ -281,7 +284,7 @@ test('a bound roster row points to student management instead of exposing invali
   const bound={id:2,cohort_id:1,revision:2,user_id:'student',display_name:'연결 학생',canonical_gmail:'bound@gmail.com',phone_last_four:'1002',cohort_name:'유유스 1기',status:'bound',source_reference:''};
   const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort],roster:[bound],totals:{applications:0,students:1,roster:1}}}));
   await admin.load();
-  const record=root.querySelectorAll('article').find(node=>textOf(node).includes('bound@gmail.com'));
+  const record=root.querySelectorAll('tr').find(node=>textOf(node).includes('bound@gmail.com'));
   assert.match(textOf(record),/계정 연결됨.*수강생 관리에서 변경/);
   assert.equal(findButton(record,'수정'),undefined);
   assert.equal(findButton(record,'취소'),undefined);
@@ -302,33 +305,39 @@ test('roster cohort filter stays beside the list and each row owns its edit and 
     return args.action==='admin_snapshot' ? {data:snapshot} : {data:{ok:true}};
   });
   await admin.load();
-  let filter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
-  assert.deepEqual(filter.children.map(option=>option.textContent),['전체 기수 · 2명','유유스 1기 · 1명','유유스 2기 · 1명']);
-  filter.value='2';
-  filter.events.change();
-  filter=root.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
-  assert.equal(filter.focused,true);
-  const visibleRoster=root.querySelectorAll('article').filter(node=>textOf(node).includes('@gmail.com'));
-  assert.equal(visibleRoster.length,1);
-  assert.match(textOf(visibleRoster[0]),/둘 학생.*유유스 2기/);
-  assert.doesNotMatch(textOf(visibleRoster[0]),/첫 학생/);
+  // 왼쪽 기수 카드가 인원을 들고 있고, 누르면 오른쪽 명단이 그 기수만 보인다.
+  const pickButtons=()=>root.querySelectorAll('button').filter(node=>/명단 (보기|접기)$/.test(String(node.attrs['aria-label']||'')));
+  assert.deepEqual(pickButtons().map(node=>node.textContent),['1명 명단 보기','1명 명단 보기']);
+  const listOf=()=>root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-management'));
+  assert.match(textOf(listOf()),/second@gmail\.com/);
+  await pickButtons()[0].events.click();
+  assert.match(textOf(listOf()),/등록 명단 · 유유스 1기/);
+  assert.doesNotMatch(textOf(listOf()),/second@gmail\.com/,'고른 기수만 보인다');
+  await pickButtons()[0].events.click();
+  assert.match(textOf(listOf()),/second@gmail\.com/,'다시 누르면 전체로 돌아온다');
+  // 유유스 2기만 보이게 고른다 — 기수는 왼쪽 단추로만 고른다.
+  await pickButtons()[1].events.click();
+  const rosterRows=()=>listOf().querySelectorAll('tr').filter(node=>String(node.className)==='academy-roster-record');
+  assert.equal(rosterRows().length,1);
+  assert.match(textOf(rosterRows()[0]),/둘 학생.*유유스 2기/);
+  assert.doesNotMatch(textOf(listOf()),/첫 학생/);
 
-  findButton(visibleRoster[0],'수정').events.click();
-  const editAction=findButton(visibleRoster[0],'수정');
-  assert.equal(editAction.attrs['aria-expanded'],'true');
-  const editInputs=visibleRoster[0].querySelectorAll('input');
+  // ★수정 입력은 그 줄 **바로 아래 칸**에서 열린다 — 줄 자체는 한 줄로 남는다.
+  findButton(listOf(),'수정').events.click();
+  assert.equal(findButton(listOf(),'수정').attrs['aria-expanded'],'true');
+  const editInputs=listOf().querySelectorAll('input');
   editInputs.find(node=>node.value==='둘 학생').value='둘째 학생';
   editInputs.find(node=>node.value==='second').value='Second.Updated';
   editInputs.find(node=>node.value==='2222').value='2323';
+  // 한 구역 안에 수정 사유와 취소 사유가 둘 다 있다 — 수정은 **첫 번째**다.
   editInputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='연락처 확인';
-  await findButton(visibleRoster[0],'수정 내용 저장').events.click();
+  await findButton(listOf(),'수정 내용 저장').events.click();
   assert.equal(calls[1].action,'roster_update');
   assert.deepEqual(JSON.parse(JSON.stringify(calls[1].payload)),{roster_entry_id:22,revision:3,display_name:'둘째 학생',gmail_local_id:'second.updated',phone_last_four:'2323',source_reference:'',reason:'연락처 확인'});
 
-  const refreshedRoster=root.querySelectorAll('article').find(node=>textOf(node).includes('second@gmail.com'));
-  findButton(refreshedRoster,'취소').events.click();
-  refreshedRoster.querySelectorAll('input').filter(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').at(-1).value='등록 오류';
-  await findButton(refreshedRoster,'명단 취소하기').events.click();
+  findButton(listOf(),'취소').events.click();
+  listOf().querySelectorAll('input').filter(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').at(-1).value='등록 오류';
+  await findButton(listOf(),'명단 취소하기').events.click();
   assert.equal(calls[3].action,'roster_cancel');
   assert.deepEqual(JSON.parse(JSON.stringify(calls[3].payload)),{roster_entry_id:22,revision:3,reason:'등록 오류'});
 });
@@ -472,10 +481,14 @@ test('the client displays at most 100 roster rows to match its pagination step',
   const {root,admin}=setup(async()=>({data:{...copy,cohorts:[cohort],roster,totals:{applications:0,students:0,roster:150}}}));
   await admin.load();
   const management=root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-card'));
-  const rosterRecords=management.querySelectorAll('article').filter(node=>textOf(node).includes('@gmail.com'));
+  const rosterRecords=management.querySelectorAll('tr').filter(node=>String(node.className)==='academy-roster-record');
   assert.equal(rosterRecords.length,100);
-  const filter=management.querySelectorAll('select').find(node=>node.attrs['aria-label']==='등록 명단 기수 선택');
-  assert.match(filter.children[0].textContent,/현재 페이지 전체 · 100명/);
+  // 100명이어도 화면이 아래로 늘어나지 않는다 — 표 안에서 세로로 구른다.
+  const scroll=management.querySelectorAll('div').find(node=>String(node.className).includes('academy-roster-scroll'));
+  assert.ok(scroll,'명단은 스크롤 상자 안에 있어야 한다');
+  assert.match(css,/\.academy-admin \.academy-roster-scroll \{ max-height: 420px; overflow-y: auto;/);
+  assert.match(css,/\.academy-admin \.academy-roster-table thead th \{ position: sticky;/);
+  assert.match(textOf(management),/100명 표시/);
 });
 test('a later page keeps its previous-page escape when totals shrink',async()=>{
   const snapshot={...copy,totals:{applications:0,students:0,roster:100}};

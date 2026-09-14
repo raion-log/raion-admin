@@ -131,6 +131,22 @@
   .academy-admin .academy-setup > .academy-card { margin-bottom: 16px; }
 }
 
+/* ★명단은 길어져도 **아래로 늘어나지 않는다** — 표 안에서 세로로 구른다 (사용자 2026-09-14).
+   100명이면 예전 카드 방식으로 300줄이었다. 머리글은 붙여 두어 굴러도 무슨 칸인지 안다. */
+.academy-admin .academy-roster-scroll { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+.academy-admin .academy-roster-table { min-width: 0; }
+.academy-admin .academy-roster-table thead th { position: sticky; top: 0; z-index: 1; background: var(--bg2, #111); }
+.academy-admin .academy-roster-table .academy-roster-actions { display: flex; gap: 6px; white-space: nowrap; }
+.academy-admin .academy-roster-table .academy-roster-actions .btn { min-width: 0; min-height: 0; padding: 5px 10px; }
+/* 수정·취소 입력 칸은 접혀 있을 때 줄을 만들지 않는다. */
+.academy-admin .academy-roster-panel-row > td { padding: 0; border-bottom: 0; }
+.academy-admin .academy-roster-table .academy-roster-panel { margin: 0 0 12px; }
+.academy-admin .academy-roster-filter input { min-height: 36px; }
+
+/* 고른 기수는 눈에 보여야 한다 — 오른쪽 명단이 그 기수만 보이고 있다는 뜻이다. */
+.academy-admin .academy-cohort-card > .btn { width: 100%; margin-top: 10px; justify-content: center; }
+.academy-admin .academy-cohort-picked { border-color: var(--accent, #ffd700); background: rgba(255, 215, 0, .05); }
+
 @media (max-width: 720px) {
   .academy-admin .academy-heading { align-items: stretch; flex-direction: column; }
   .academy-admin .academy-heading .btn { width: fit-content; min-height: 44px; }
