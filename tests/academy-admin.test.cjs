@@ -18,6 +18,36 @@ class Element {
   }
 }
 const copy = {version:2,applications:[],students:[],cohorts:[],roster:[],audit:[]};
+const css = fs.readFileSync(require('node:path').join(__dirname,'../academy-admin.css'),'utf8');
+test('the base form and disclosure styles survive — a region replace once ate all 21 of them', () => {
+  // ★2026-09-14 실사고: 표 규칙을 넣으며 「내 주석 ~ .academy-pagination」 구간을 통째로 바꿨는데
+  //   그 사이에 label·input·select·접기 기본 서식이 들어 있었다. 화면이 흰 입력칸으로 깨졌고
+  //   시험은 전부 초록이었다 — JS 만 읽고 CSS 는 아무도 안 봤기 때문이다.
+  for (const rule of [
+    '.academy-admin label { display: flex;',
+    '.academy-admin input, .academy-admin select { width: 100%;',
+    '.academy-admin input:focus, .academy-admin select:focus {',
+    '.academy-admin .academy-fields { display: flex;',
+    '.academy-admin .academy-actions { display: flex;',
+    '.academy-admin .academy-disclosure { margin-top: 8px;',
+    '.academy-admin .academy-disclosure summary { display: flex;',
+    '.academy-admin .academy-disclosure summary::after {',
+    '.academy-admin .academy-disclosure-body {',
+    '.academy-admin :is(button, input, select):focus-visible {'
+  ]) assert.ok(css.includes(rule), `기본 서식이 사라졌다: ${rule}`);
+});
+test('table cells never break a word across two lines', () => {
+  // 「유유스 1기」가 「유유스 1 / 기」로, 「김수한무거북이」가 두 줄로 쪼개졌다 — 다른 탭에서
+  // 「차단」이 「차/단」이 된 것과 같은 결함이다. 모자라면 표를 가로로 민다.
+  for (const rule of [
+    '.academy-admin .academy-table th,',
+    '.academy-admin .academy-table td { white-space: nowrap; }',
+    '.academy-admin .academy-table { width: 100%; border-collapse: collapse; min-width:',
+    // 칸 안의 입력이 width:100% 를 물려받으면 칸이 끝없이 넓어진다.
+    '.academy-admin .academy-table input[type="text"] { width: auto;'
+  ]) assert.ok(css.includes(rule), `표 규칙이 사라졌다: ${rule}`);
+});
+
 function setup(rpc,confirm=()=>true,timers={setTimeout,clearTimeout}) {
   const root=new Element('section');
   const window={confirm};

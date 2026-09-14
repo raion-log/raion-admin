@@ -68,24 +68,48 @@
 .academy-admin .academy-record { padding: 16px 0; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-record:last-child { padding-bottom: 0; }
 .academy-admin .academy-record p { color: var(--text2, #b0b0b0); font-size: 13px; }
+.academy-admin .academy-disclosure { margin-top: 8px; border-top: 1px solid var(--border, #2a2a2a); }
+.academy-admin .academy-disclosure summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 28px 8px 0; position: relative; cursor: pointer; color: var(--text2, #b0b0b0); font-size: 13px; font-weight: 600; list-style: none; }
+.academy-admin .academy-disclosure summary::-webkit-details-marker { display: none; }
+.academy-admin .academy-disclosure summary::after { content: ''; position: absolute; right: 4px; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform 160ms ease-out; }
+.academy-admin .academy-disclosure[open] summary::after { transform: rotate(225deg) translate(-2px, -2px); }
+.academy-admin .academy-disclosure summary:hover { color: var(--accent, #ffd700); }
+.academy-admin .academy-disclosure summary:active { opacity: .78; }
+.academy-admin .academy-disclosure summary:focus-visible { outline: 2px solid var(--accent, #ffd700); outline-offset: 2px; }
+.academy-admin .academy-disclosure-title { color: var(--text, #e8e8e8); }
+.academy-admin .academy-disclosure-meta { color: var(--text2, #b0b0b0); font-weight: 400; }
+.academy-admin .academy-disclosure-body { padding: 4px 0 12px; }
+.academy-admin .academy-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.academy-admin .academy-fields { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; align-items: end; }
+.academy-admin label { display: flex; flex: 1 1 200px; flex-direction: column; gap: 4px; color: var(--text2, #b0b0b0); font-size: 12px; }
+.academy-admin input, .academy-admin select { width: 100%; min-height: 40px; padding: 10px 14px; border: 1px solid var(--border, #2a2a2a); border-radius: 8px; outline: none; background: var(--bg3, #1a1a1a); color: var(--text, #e8e8e8); font: inherit; font-size: 14px; }
+.academy-admin input:focus, .academy-admin select:focus { border-color: var(--accent, #ffd700); }
+.academy-admin .btn { min-height: 40px; }
+.academy-admin button:disabled, .academy-admin input:disabled, .academy-admin select:disabled { opacity: .5; cursor: default; }
+.academy-admin :is(button, input, select):focus-visible { outline: 2px solid var(--accent, #ffd700); outline-offset: 2px; }
+.academy-admin [role="alert"] { color: #ff8da1; }
+.academy-admin .academy-pagination { display: flex; gap: 8px; margin: 4px 0 12px; }
+.academy-admin .academy-history-list { margin: 0 0 8px; padding-left: 20px; }
+.academy-admin .academy-history-list li { margin: 8px 0; color: var(--text2, #b0b0b0); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+
 /* ★수강생·가입 신청은 다른 탭들과 같은 **표**다 — 한 사람 = 한 줄 (사용자 2026-09-14).
    앞 네 칸의 순서는 어느 표에서나 같다: 이메일 · 성함 · 끝 4자리 · 기수. */
 .academy-admin .academy-table { width: 100%; border-collapse: collapse; min-width: 1180px; }
 .academy-admin .academy-table td { vertical-align: middle; }
+.academy-admin .academy-table th,
+.academy-admin .academy-table td { white-space: nowrap; }
 .academy-admin .academy-cell-id { font-weight: 600; color: var(--text, #e8e8e8); }
 .academy-admin .academy-cell-four { font-variant-numeric: tabular-nums; }
 .academy-admin .academy-cell-cohort { color: var(--text2, #b0b0b0); font-size: 13px; }
 .academy-admin .academy-table .actions { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+/* 칸 안의 입력은 제 몫만 차지한다 — 기본값 width:100% 면 칸이 끝없이 넓어진다. */
 .academy-admin .academy-table select,
-.academy-admin .academy-table input[type="text"] { min-width: 0; max-width: 210px; }
-.academy-admin .academy-table .academy-notice { margin: 4px 0 0; font-size: 12px; }
+.academy-admin .academy-table input[type="text"] { width: auto; min-width: 0; max-width: 210px; }
+.academy-admin .academy-table .academy-notice { margin: 4px 0 0; font-size: 12px; white-space: normal; }
 /* 접기를 칸 안에 넣으면 기본 여백·테두리·44px 높이가 줄을 하나 더 만든다. */
 .academy-admin .academy-table .academy-disclosure { margin-top: 0; border-top: 0; }
-.academy-admin .academy-table .academy-disclosure summary { min-height: 0; padding: 2px 22px 2px 0; white-space: nowrap; }
+.academy-admin .academy-table .academy-disclosure summary { min-height: 0; padding: 2px 22px 2px 0; }
 .academy-admin .badge-suspended { background: rgba(255, 152, 0, .15); color: #ff9800; }
-.academy-admin .academy-pagination { display: flex; gap: 8px; margin: 4px 0 12px; }
-.academy-admin .academy-history-list { margin: 0 0 8px; padding-left: 20px; }
-.academy-admin .academy-history-list li { margin: 8px 0; color: var(--text2, #b0b0b0); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
 
 @media (max-width: 720px) {
   .academy-admin .academy-heading { align-items: stretch; flex-direction: column; }
