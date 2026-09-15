@@ -695,3 +695,34 @@ test('a later page keeps its previous-page escape when totals shrink',async()=>{
   assert.ok(findButton(root,'이전 100건'));
   assert.equal(findButton(root,'다음 100건'),undefined);
 });
+
+test('tab returns preserve DOM and draft input; refresh and identity clear fetch again',async()=>{
+  let reads=0;
+  const {root,admin}=setup(async()=>{reads++;return {data:copy};});
+  await admin.ensureLoaded();
+  const input=root.querySelectorAll('input')[0];
+  input.value='작성 중인 내용';
+  await admin.ensureLoaded();
+  assert.equal(reads,1);
+  assert.equal(root.querySelectorAll('input')[0],input);
+  assert.equal(input.value,'작성 중인 내용');
+  await admin.load();
+  assert.equal(reads,2);
+  assert.notEqual(root.querySelectorAll('input')[0],input);
+  admin.clear();
+  assert.equal(root.children.length,0);
+  await admin.ensureLoaded();
+  assert.equal(reads,3);
+});
+test('tab entry retries failed snapshots and deduplicates in-flight loading',async()=>{
+  let reads=0, resolve;
+  const {admin}=setup(()=>{reads++;return reads===1?Promise.resolve({error:{message:'offline'}}):new Promise(done=>{resolve=done;});});
+  await admin.ensureLoaded();
+  const pending=admin.ensureLoaded();
+  await admin.ensureLoaded();
+  assert.equal(reads,2);
+  resolve({data:copy});
+  await pending;
+  await admin.ensureLoaded();
+  assert.equal(reads,2);
+});

@@ -4,6 +4,7 @@
   function createAcademyAdmin(client, root) {
     let epoch = 0;
     let busy = false;
+    let hasLoaded = false;
     let pageOffset = 0;
     let rosterCohortFilter = 'all';
     // 조회어도 화면을 다시 그려도 살아 있어야 한다 — 기수 고름과 같은 자리에 둔다.
@@ -1031,6 +1032,7 @@
       const token = ++epoch;
       let loaded = false;
       pageOffset = offset;
+      hasLoaded = false;
       busy = true; shell(); disabled(true); message('학습실 관리 정보를 확인하고 있습니다.');
       try {
         const { data, error } = await request('admin_snapshot', { offset: pageOffset });
@@ -1072,6 +1074,7 @@
         root.append(content);
         message(successMessage || '학습실 전용 권한과 최신 정보를 확인했습니다.');
         loaded = true;
+        hasLoaded = true;
       } catch (error) {
         if (token === epoch) { message(errorMessage(error), true); status.focus(); }
       } finally {
@@ -1082,8 +1085,10 @@
         }
       }
     }
-    function clear() { epoch++; cancelConfirmation?.(); busy = false; pageOffset = 0; rosterCohortFilter = 'all'; root.replaceChildren(); }
-    return { load, clear };
+    function clear() { hasLoaded = false; epoch++; cancelConfirmation?.(); busy = false; pageOffset = 0; rosterCohortFilter = 'all'; rosterSearch = ''; root.replaceChildren(); }
+    // 탭 복귀는 기존 DOM을 보여주고, 명시적 새로고침/저장만 재조회한다.
+    function ensureLoaded() { if (!hasLoaded) return load(); }
+    return { load, ensureLoaded, clear };
   }
   global.createAcademyAdmin = createAcademyAdmin;
 })(typeof window === 'undefined' ? globalThis : window);
