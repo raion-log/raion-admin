@@ -50,6 +50,10 @@ test('table cells never break a word across two lines', () => {
     '.academy-admin .academy-table input[type="text"] { width: 130px;'
   ]) assert.ok(css.includes(rule), `표 규칙이 사라졌다: ${rule}`);
 });
+test('resume remains neon green with a restrained background', () => {
+  assert.match(css, /\.btn-account-resume \{ background: rgba\(163,255,18,\.12\); border-color: rgba\(163,255,18,\.55\); color: #baff52; \}/);
+  assert.doesNotMatch(css, /\.btn-account-resume \{ background: #a3ff12;/);
+});
 
 function setup(rpc,confirm=()=>true,timers={setTimeout,clearTimeout}) {
   const root=new Element('section');
