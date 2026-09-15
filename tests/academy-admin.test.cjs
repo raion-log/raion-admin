@@ -10,7 +10,7 @@ class Element {
   appendChild(node) { node.parent=this; this.children.push(node); return node; }
   remove() { if(this.parent) this.parent.children=this.parent.children.filter(n=>n!==this); }
   close() { this.open=false; this.events.close?.(); }
-  replaceChildren(...nodes) { this.children=nodes; }
+  replaceChildren(...nodes) { this.textContent=''; this.children=nodes; }
   setAttribute(k,v) { this.attrs[k]=v; }
   addEventListener(k,v) { this.events[k]=v; }
   focus() { if (!this.disabled) this.focused=true; }
@@ -448,7 +448,7 @@ test('sorting stays inside student management and the page-wide search toolbar i
   await admin.load();
   assert.doesNotMatch(textOf(root),/현재 페이지 목록 찾기|현재 페이지 관리 목록 검색|검색 지우기/);
   const studentSection=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 관리 (2)'));
-  assert.match(textOf(studentSection),/수강생 정렬.*이름.*Gmail.*기수.*상태/);
+  assert.doesNotMatch(textOf(studentSection),/수강생 정렬/);
   // ★한 사람은 한 줄이고 칸 순서는 아이디 · 이름 · 끝 4자리 · 기수 · 상태 다 (사용자 2026-09-14).
   //   예전엔 이름만 든 h4 를 읽었다 — 세 줄로 쌓여 있어 그게 가능했다.
   // ★한 사람은 한 줄이고, 앞 네 칸 순서는 이메일 · 성함 · 끝 4자리 · 기수 다 (사용자 2026-09-14).
@@ -457,12 +457,16 @@ test('sorting stays inside student management and the page-wide search toolbar i
   const lines=()=>rows().map(node=>node.children.slice(0,5).map(c=>textOf(c).trim()).join(' · '));
   const 가='alpha@gmail.com · 가 학생 · 1111 · 유유스 1기 · 이용 가능';
   const 나='beta@gmail.com · 나 학생 · 2222 · 유유스 2기 · 이용 정지';
-  assert.deepEqual(studentSection.querySelectorAll('th').map(node=>node.textContent).slice(0,5),
-    ['이메일','성함','끝 4자리','기수','상태']);
-  await findButton(studentSection,'이름').events.click();
+  assert.deepEqual(studentSection.querySelectorAll('th').map(node=>textOf(node).trim()).slice(0,5),
+    ['이메일 ⇅','성함 ⇅','끝 4자리 ⇅','기수 ⇅','상태 ⇅']);
+  const draft=rows()[0].querySelectorAll('input')[0];
+  draft.value='정렬 뒤에도 유지할 사유';
+  await findButton(studentSection,'성함 ⇅').events.click();
   assert.deepEqual(lines(),[가,나]);
-  await findButton(studentSection,'이름 ↑').events.click();
+  await findButton(studentSection,'성함 ▲').events.click();
   assert.deepEqual(lines(),[나,가]);
+  assert.equal(rows()[0].querySelectorAll('input')[0],draft);
+  assert.equal(draft.value,'정렬 뒤에도 유지할 사유');
   // 한 사람은 <tr> 하나다 — 카드나 접기가 다시 생기면 여기서 걸린다.
   assert.equal(rows().length,2);
   assert.equal(studentSection.querySelectorAll('article').length,0,'수강생을 카드로 되돌리면 안 된다');
@@ -478,7 +482,7 @@ test('academy account rows edit role and profile in one modal without changing t
   const {root,admin}=setup(async(_name,args)=>{calls.push(args); return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
   await admin.load();
   const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (2)'));
-  assert.deepEqual(section.querySelectorAll('th').map(node=>node.textContent),['','이메일','성함','끝 4자리','기수','역할','상태','관리']);
+  assert.deepEqual(section.querySelectorAll('th').map(node=>textOf(node).trim()),['','이메일 ⇅','성함 ⇅','끝 4자리 ⇅','기수 ⇅','역할 ⇅','상태 ⇅','관리']);
   assert.match(textOf(section),/admin[.]check@gmail[.]com.*관리자.*student[.]check@gmail[.]com.*수강생/);
   assert.doesNotMatch(textOf(section),/기수 변경/);
   const studentRow=section.querySelectorAll('tr').find(node=>textOf(node).includes('student.check@gmail.com'));
@@ -514,6 +518,13 @@ test('academy account rows have left-side selection and one atomic bulk change c
   assert.equal(section.querySelectorAll('input').filter(node=>String(node.attrs['aria-label']).endsWith('계정 선택')).length,2);
   selectAll.checked=true; selectAll.events.change();
   assert.match(textOf(section),/2명 선택/);
+  await findButton(section,'성함 ⇅').events.click();
+  await findButton(section,'성함 ▲').events.click();
+  const sorted=section.querySelectorAll('tr').filter(node=>node.className==='academy-row');
+  assert.deepEqual(sorted.map(row=>row.children[2].textContent),['나 학생','가 학생']);
+  assert.ok(sorted.every(row=>row.children[0].children[0].checked),'정렬 뒤 선택 유지');
+  assert.equal(section.querySelectorAll('th')[2].attrs['aria-sort'],'descending');
+  assert.equal(calls.length,1,'정렬은 DB 쓰기를 발생시키지 않는다');
   const role=section.querySelectorAll('select').find(node=>node.attrs['aria-label']==='선택 계정 역할 변경');
   const cohort=section.querySelectorAll('select').find(node=>node.attrs['aria-label']==='선택 코치 담당 기수');
   const status=section.querySelectorAll('select').find(node=>node.attrs['aria-label']==='선택 계정 이용 상태 변경');

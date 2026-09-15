@@ -212,12 +212,38 @@
         const selectHead = el('th'); selectHead.className = 'academy-select-cell'; selectHead.appendChild(selectAll);
         headRow.appendChild(selectHead);
       }
-      for (const label of [...PERSON_HEAD, ...headers]) headRow.appendChild(el('th', label));
+      for (const label of [...PERSON_HEAD, ...headers]) {
+        const heading = el('th', label);
+        if (label === '관리') heading.className = 'academy-management-heading';
+        headRow.appendChild(heading);
+      }
       head.appendChild(headRow);
       const body = el('tbody');
       table.append(head, body);
       scroll.appendChild(table);
-      return { scroll, body, selectAll };
+      return { scroll, body, selectAll, headers: Array.from(headRow.children).slice(selectable ? 1 : 0) };
+    }
+    function sortableHeaders(headers, modes, onSort) {
+      let field = '', direction = 'asc';
+      const controls = modes.map(([key, label], index) => {
+        const heading = headers[index];
+        const trigger = button(label, () => {
+          direction = field === key && direction === 'asc' ? 'desc' : 'asc';
+          field = key;
+          for (const item of controls) {
+            const active = item.key === field;
+            item.heading.setAttribute('aria-sort', active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none');
+            item.trigger.textContent = `${item.label} ${active ? (direction === 'asc' ? '▲' : '▼') : '⇅'}`;
+          }
+          onSort(field, direction);
+        });
+        trigger.className = 'academy-column-sort';
+        trigger.setAttribute('aria-label', `${label} 정렬`);
+        trigger.textContent = `${label} ⇅`;
+        heading.setAttribute('aria-sort', 'none');
+        heading.replaceChildren(trigger);
+        return { key, label, heading, trigger };
+      });
     }
     function personRow(row, selector = null) {
       const tr = el('tr', undefined, 'academy-row');
@@ -321,16 +347,18 @@
         suspended: { short: '정지', full: '이용 정지로 변경' },
         revoked: { short: '해지', full: '이용 해지로 변경' }
       };
-      const { scroll, body } = personTable(['상태', '기수 변경', '변경 사유', '관리', '최근 이력']);
+      const { scroll, body, headers } = personTable(['상태', '기수 변경', '변경 사유', '관리', '최근 이력']);
       let sortField = '';
       let sortDirection = 'asc';
-      const sortModes = [['name', '이름'], ['email', 'Gmail'], ['cohort', '기수'], ['status', '상태']];
+      const sortModes = [['email', '이메일'], ['name', '성함'], ['phone', '끝 4자리'], ['cohort', '기수'], ['status', '상태']];
       const sortValue = (row, mode) => ({
         name: row.display_name,
+        phone: row.phone_last_four,
         email: row.canonical_gmail,
         cohort: row.cohort_name,
         status: statuses[row.status] || row.status
       })[mode] || '';
+      const studentNodes = new Map();
       const renderRows = () => {
         const visible = sortField ? [...rows].sort((a, b) => {
           const result = String(sortValue(a, sortField)).toLowerCase().localeCompare(String(sortValue(b, sortField)).toLowerCase(), 'ko', { numeric: true });
@@ -338,6 +366,7 @@
         }) : rows;
         body.replaceChildren();
         for (const row of visible) {
+          if (studentNodes.has(row.user_id)) { body.appendChild(studentNodes.get(row.user_id)); continue; }
           const candidates = Array.isArray(row.roster_options) ? row.roster_options : [];
           const rosterSelect = rosterField(candidates), reason = reasonField();
           rosterSelect.setAttribute('aria-label', `${row.display_name} 현재 기수로 사용할 등록 명단`);
@@ -359,6 +388,7 @@
             cell(assign), cell(reason), cell(actions),
             cell(historyDisclosure(row.user_id, audit))
           );
+          studentNodes.set(row.user_id, tr);
           body.appendChild(tr);
         }
       };
@@ -366,29 +396,9 @@
         section.appendChild(el('p', '등록된 학습실 수강생이 없습니다.', 'empty'));
         return section;
       }
-      if (rows.length > 1) {
-        const controls = el('div', undefined, 'academy-student-sort');
-        controls.appendChild(el('span', '수강생 정렬', 'academy-student-sort-label'));
-        const sortButtons = sortModes.map(([value, label]) => {
-          const control = button(label, () => {
-            sortDirection = sortField === value && sortDirection === 'asc' ? 'desc' : 'asc';
-            sortField = value;
-            for (const [index, [mode, modeLabel]] of sortModes.entries()) {
-              const active = mode === sortField;
-              sortButtons[index].setAttribute('aria-pressed', String(active));
-              sortButtons[index].textContent = `${modeLabel}${active ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}`;
-              sortButtons[index].setAttribute('aria-label', `${modeLabel} ${active && sortDirection === 'asc' ? '내림차순으로' : '오름차순으로'} 정렬`);
-            }
-            renderRows();
-          });
-          control.className += ' academy-sort-button';
-          control.setAttribute('aria-pressed', 'false');
-          control.setAttribute('aria-label', `${label} 오름차순으로 정렬`);
-          return control;
-        });
-        controls.append(...sortButtons);
-        section.appendChild(controls);
-      }
+      sortableHeaders(headers, sortModes, (field, direction) => {
+        sortField = field; sortDirection = direction; renderRows();
+      });
       renderRows();
       section.appendChild(scroll);
       return section;
@@ -406,10 +416,11 @@
       let sortField = '';
       let sortDirection = 'asc';
       const selected = new Set();
-      const { scroll, body, selectAll } = personTable(['역할', '상태', '관리'], true);
-      const sortModes = [['name','이름'],['email','Gmail'],['cohort','기수'],['role','역할'],['status','상태']];
+      const { scroll, body, selectAll, headers } = personTable(['역할', '상태', '관리'], true);
+      const sortModes = [['email','이메일'],['name','성함'],['phone','끝 4자리'],['cohort','기수'],['role','역할'],['status','상태']];
       const sortValue = (row, mode) => ({
         name: row.display_name,
+        phone: row.phone_last_four,
         email: row.canonical_gmail,
         cohort: row.cohort_name,
         role: roleLabels[row.role] || row.role,
@@ -550,7 +561,7 @@
             syncSelection();
           });
           const actions = el('div', undefined, 'actions academy-account-actions');
-          actions.appendChild(briefButton('수정', `${row.display_name} 계정 정보 수정`, () => openEditor(row)));
+          actions.appendChild(briefButton('수정', `${row.display_name} 계정 정보 수정`, () => openEditor(row), 'primary'));
           const statusAction = row.account_active ? { short:'정지', status:'suspended', label:'이용을 정지' } : { short:'재개', status:'active', label:'이용을 재개' };
           const protectedAdmin = row.role === 'admin' && row.account_active && activeAdminCount <= 1;
           const statusButton = briefButton(statusAction.short, protectedAdmin ? '마지막 관리자는 정지할 수 없습니다' : `${row.display_name} 계정 ${statusAction.label}`, () => {
@@ -576,22 +587,9 @@
         syncSelection();
       };
       section.appendChild(bulkBar);
-      if (rows.length > 1) {
-        const controls = el('div', undefined, 'academy-student-sort');
-        controls.appendChild(el('span', '계정 정렬', 'academy-student-sort-label'));
-        const buttons = sortModes.map(([value,label]) => {
-          const control = button(label, () => {
-            sortDirection = sortField === value && sortDirection === 'asc' ? 'desc' : 'asc'; sortField = value;
-            for (const [index,[mode,modeLabel]] of sortModes.entries()) {
-              const active = mode === sortField; buttons[index].setAttribute('aria-pressed',String(active));
-              buttons[index].textContent = `${modeLabel}${active ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}`;
-            }
-            renderRows();
-          });
-          control.className += ' academy-sort-button'; control.setAttribute('aria-pressed','false'); return control;
-        });
-        controls.append(...buttons); section.appendChild(controls);
-      }
+      sortableHeaders(headers, sortModes, (field, direction) => {
+        sortField = field; sortDirection = direction; renderRows();
+      });
       renderRows(); section.appendChild(scroll); return section;
     }
     function input(type, placeholder) {
@@ -972,10 +970,21 @@
         scroll.setAttribute('tabindex','0');
         const table=el('table',undefined,'academy-table academy-roster-table');
         const head=el('thead'),headRow=el('tr');
-        for(const label of ['이름','끝 4자리','Gmail','기수','상태','관리']) headRow.appendChild(el('th',label));
+        for(const label of ['이름','끝 4자리','Gmail','기수','상태','관리']) {
+          const heading=el('th',label);
+          if(label==='관리') heading.className='academy-management-heading';
+          headRow.appendChild(heading);
+        }
         head.appendChild(headRow);
         const body=el('tbody');
-        for(const row of source) body.append(...rosterRecord(row));
+        const records=source.map(row=>({row,nodes:rosterRecord(row)}));
+        for(const record of records) body.append(...record.nodes);
+        sortableHeaders(Array.from(headRow.children), [['display_name','이름'],['phone_last_four','끝 4자리'],['canonical_gmail','Gmail'],['cohort_name','기수'],['status','상태']], (field,direction)=>{
+          const value=row=>String(field==='status' ? labels[row.status] : row[field] || '');
+          const sorted=[...records].sort((a,b)=>value(a.row).localeCompare(value(b.row),'ko',{numeric:true,sensitivity:'base'})*(direction==='asc'?1:-1));
+          // 기존 행을 이동해 열린 수정창과 입력값을 보존한다.
+          body.replaceChildren(...sorted.flatMap(record=>record.nodes));
+        });
         table.append(head,body);
         scroll.appendChild(table);
         return scroll;

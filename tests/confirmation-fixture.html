@@ -2,7 +2,15 @@
 <html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>합성 데이터 확인창 검증 — 실제 DB 연결 없음</title>
 <link rel="stylesheet" href="../academy-admin.css">
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#141414;color:#eee;font:16px sans-serif;margin:20px}.btn{background:#333;color:#fff;border:1px solid #777;border-radius:6px;padding:10px;cursor:pointer}</style>
+<script>
+// 실제 공통 CSS만 가져온다. 운영 스크립트나 인증은 실행하지 않는다.
+fetch('../index.html').then(response=>response.text()).then(html=>{
+  const style=document.createElement('style');
+  style.textContent=new DOMParser().parseFromString(html,'text/html').querySelector('style').textContent;
+  document.head.appendChild(style);
+});
+</script>
+<style>body{padding:20px}body>h1{font-size:20px;margin-bottom:8px}</style>
 <h1>합성 데이터 검증 · 실제 DB 연결 없음</h1><p id="count">등록 요청: 0</p><section id="academy" class="academy-admin"></section>
 <script src="../academy-admin.js"></script>
 <script>

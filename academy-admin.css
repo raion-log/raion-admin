@@ -19,9 +19,6 @@
 .academy-admin .academy-overview-label { color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-overview-value { color: var(--text, #e8e8e8); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .academy-admin .academy-count { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border: 1px solid var(--border, #2a2a2a); border-radius: 999px; color: var(--text, #e8e8e8); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.academy-admin .academy-student-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border, #2a2a2a); }
-.academy-admin .academy-student-sort-label { margin-right: 4px; color: var(--text2, #b0b0b0); font-size: 12px; font-weight: 600; }
-.academy-admin .academy-sort-button[aria-pressed="true"] { border-color: var(--accent, #ffd700); color: var(--accent, #ffd700); }
 
 .academy-admin .academy-card { background: var(--bg2, #111); border: 1px solid var(--border, #2a2a2a); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
 .academy-admin .academy-management-card > .academy-notice { margin-top: -8px; }
@@ -174,7 +171,6 @@
   .academy-admin .academy-heading { align-items: stretch; flex-direction: column; }
   .academy-admin .academy-heading .btn { width: fit-content; min-height: 44px; }
   .academy-admin .academy-overview { gap: 8px 18px; padding: 12px 14px; }
-  .academy-admin .academy-student-sort-label { flex-basis: 100%; }
   .academy-admin .academy-fields { display: grid; grid-template-columns: 1fr; }
   .academy-admin .academy-roster-add .academy-fields { grid-template-columns: 1fr; }
   .academy-admin label { min-width: 0; }
@@ -216,3 +212,20 @@
 @media (prefers-reduced-motion: reduce) {
   .academy-admin *, .academy-admin *::before, .academy-admin *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* 다른 관리 탭과 같은 정보 크기와 상태 색상. */
+.academy-admin .academy-table th { font-size: 12px; }
+.academy-admin .academy-table td, .academy-admin .academy-cell-cohort { font-size: 14px; }
+.academy-admin .academy-column-sort { appearance: none; min-height: 36px; padding: 8px 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; white-space: nowrap; }
+.academy-admin th[aria-sort="ascending"], .academy-admin th[aria-sort="descending"] { color: var(--accent, #ffd700); }
+.academy-admin .academy-management-heading { text-align: center; }
+.academy-admin .academy-table .actions { justify-content: center; }
+.academy-admin .academy-account-actions .btn { min-width: 48px; min-height: 36px; justify-content: center; padding: 6px 10px; font-size: 12px; }
+.academy-admin .badge-active { color: #a3ff12; background: rgba(163,255,18,.12); }
+.academy-admin .badge-suspended { color: #b0b0b0; background: rgba(150,150,150,.15); }
+.academy-admin .badge-revoked { color: var(--red, #e94560); background: rgba(233,69,96,.15); }
+@media (max-width: 600px) {
+  .academy-admin .academy-column-sort, .academy-admin .academy-account-actions .btn { min-height: 44px; }
+}
+
+.academy-admin .academy-roster-actions { justify-content: center; }

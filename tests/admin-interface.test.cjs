@@ -77,7 +77,7 @@ test('sortable headers are scoped, use native keyboard buttons, and editor bulk 
   assert.match(source, /const ids = \[\.\.\.edSel\[kind\]\]\.filter\(id => visibleIds\.has\(id\)\)/);
   assert.match(source, /setAttribute\('aria-sort'/);
   assert.doesNotMatch(academySource, /현재 페이지 목록 찾기|academy-list-controls/);
-  assert.match(academySource, /\[\['name', '이름'\], \['email', 'Gmail'\], \['cohort', '기수'\], \['status', '상태'\]\]/);
+  assert.match(academySource, /function sortableHeaders/);
 });
 
 test('uvengers tables stay inside labelled responsive scroll regions', () => {
