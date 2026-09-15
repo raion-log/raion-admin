@@ -562,13 +562,13 @@
           });
           const actions = el('div', undefined, 'actions academy-account-actions');
           actions.appendChild(briefButton('수정', `${row.display_name} 계정 정보 수정`, () => openEditor(row), 'primary'));
-          const statusAction = row.account_active ? { short:'정지', status:'suspended', label:'이용을 정지' } : { short:'재개', status:'active', label:'이용을 재개' };
+          const statusAction = row.account_active ? { short:'이용 정지', status:'suspended', label:'이용을 정지' } : { short:'이용 재개', status:'active', label:'이용을 재개' };
           const protectedAdmin = row.role === 'admin' && row.account_active && activeAdminCount <= 1;
           const statusButton = briefButton(statusAction.short, protectedAdmin ? '마지막 관리자는 정지할 수 없습니다' : `${row.display_name} 계정 ${statusAction.label}`, () => {
             const reason = reasonField(); reason.value = row.account_active ? '관리자 화면에서 이용 정지' : '관리자 화면에서 이용 재개';
             return mutate('account_set_status',{user_id:row.user_id,revision:row.revision,status:statusAction.status},reason,
               `${row.display_name} 계정의 ${statusAction.label}할까요?`);
-          }, row.account_active ? 'outline' : 'primary');
+          }, row.account_active ? 'account-suspend' : 'account-resume');
           statusButton.disabled = protectedAdmin;
           actions.appendChild(statusButton);
           const deleteButton = briefButton('삭제', protectedAdmin ? '마지막 관리자는 삭제할 수 없습니다' : `${row.display_name} 유유스 접근권 삭제`, () => {

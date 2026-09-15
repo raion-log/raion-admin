@@ -229,3 +229,9 @@
 }
 
 .academy-admin .academy-roster-actions { justify-content: center; }
+
+/* 상태 변경은 노란 정보 수정과 구분한다. */
+.academy-admin .btn-account-resume { background: #a3ff12; border-color: #a3ff12; color: #172400; }
+.academy-admin .btn-account-resume:hover { background: #b8ff4d; border-color: #b8ff4d; }
+.academy-admin .btn-account-suspend { background: #343434; border-color: #686868; color: #f0f0f0; }
+.academy-admin .btn-account-suspend:hover { background: #484848; border-color: #909090; }

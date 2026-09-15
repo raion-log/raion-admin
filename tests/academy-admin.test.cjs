@@ -545,7 +545,7 @@ test('academy account actions expose edit, suspend and Academy-only delete with 
   const {root,admin}=setup(async(_name,args)=>{calls.push(args);return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
   await admin.load();
   const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
-  assert.ok(findButton(section,'수정')); assert.ok(findButton(section,'정지')); assert.ok(findButton(section,'삭제'));
+  assert.ok(findButton(section,'수정')); assert.ok(findButton(section,'이용 정지')); assert.ok(findButton(section,'삭제'));
   const pending=findButton(section,'삭제').events.click();
   const dialog=root.querySelectorAll('dialog')[0];
   assert.match(textOf(dialog),/Gmail 계정과 다른 서비스 권한은 유지됩니다/);
