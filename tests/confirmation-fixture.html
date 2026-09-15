@@ -7,7 +7,22 @@
 <script src="../academy-admin.js"></script>
 <script>
 let writes=0;
-const snapshot={version:2,applications:[],students:[],roster:[],audit:[],cohorts:[{id:1,name:'검증 1기',status:'active',cohort_number:1}]};
+const cohorts=[
+  {id:1,name:'유유스 1기',status:'active',cohort_number:1,revision:3,starts_on:'2026-09-23',ends_on:'2026-11-14'},
+  {id:2,name:'유유스 2기',status:'draft',cohort_number:2,revision:1,starts_on:null,ends_on:null}
+];
+const roster=Array.from({length:18},(_,index)=>({
+  id:index+1,cohort_id:index<12?1:2,revision:1,display_name:`검증 학생 ${index+1}`,
+  canonical_gmail:index<2?`student.${index+1}@gmail.com`:null,
+  phone_last_four:String(4100+index),cohort_name:index<12?'유유스 1기':'유유스 2기',
+  status:index<2?'bound':'eligible',bound_user_id:index<2?`student-${index+1}`:null,source_reference:''
+}));
+const accounts=[
+  {user_id:'admin-1',revision:2,display_name:'검증 관리자',canonical_gmail:'admin.check@gmail.com',phone_last_four:null,role:'admin',account_active:true,cohort_id:null,cohort_name:null,can_be_student:false,roster_options:[]},
+  {user_id:'student-1',revision:4,display_name:'검증 학생 1',canonical_gmail:'student.1@gmail.com',phone_last_four:'4100',role:'student',account_active:true,cohort_id:1,cohort_name:'유유스 1기',can_be_student:true,roster_options:[roster[0]]},
+  {user_id:'student-2',revision:5,display_name:'검증 학생 2',canonical_gmail:'student.2@gmail.com',phone_last_four:'4101',role:'student',account_active:false,cohort_id:1,cohort_name:'유유스 1기',can_be_student:true,roster_options:[roster[1]]}
+];
+const snapshot={version:2,applications:[],students:[],roster,audit:[],cohorts,accounts,totals:{applications:0,students:2,roster:18,accounts:3}};
 createAcademyAdmin({rpc:async(_name,args)=>{
 if(args.action==='admin_snapshot')return {data:snapshot};
 document.getElementById('count').textContent='등록 요청: '+(++writes);

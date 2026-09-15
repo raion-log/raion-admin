@@ -78,11 +78,9 @@ async function manualRoster() {
   const inputs=direct.querySelectorAll('input');
   inputs.find(n=>n.placeholder==='수강생 이름').value='합성 검증';
   inputs.find(n=>n.placeholder==='끝 4자리').value='4826';
-  const reason=inputs.find(n=>n.placeholder==='예: 수강 명단과 신청 정보를 확인함');
-  reason.value='검증 사유';
   const cohort=direct.querySelectorAll('select').find(n=>n.required);
   cohort.value='1'; cohort.selectedOptions=[{textContent:'검증 1기'}];
-  return {root,admin,calls,reason,add:findButton(root,'수강 명단에 추가')};
+  return {root,admin,calls,add:findButton(root,'수강 명단에 추가')};
 }
 test('in-page confirmation blocks writes, cancels with Escape, and permits retry',async()=>{
   const {root,calls,add}=await manualRoster();
@@ -104,16 +102,15 @@ test('in-page confirmation blocks writes, cancels with Escape, and permits retry
   await retry;
   assert.equal(calls.length,1);
 });
-test('explicit confirmation sends one snapshotted payload despite duplicate clicks',async()=>{
-  const {root,calls,add,reason}=await manualRoster();
+test('explicit confirmation sends one audited payload despite duplicate clicks',async()=>{
+  const {root,calls,add}=await manualRoster();
   const pending=add.events.click();
   await add.events.click();
-  reason.value='변경된 사유';
   const apply=findButton(root,'확인하고 적용');
   apply.events.click(); apply.events.click();
   await pending;
   assert.equal(calls.filter(c=>c.action==='roster_add').length,1);
-  assert.equal(calls[1].payload.reason,'검증 사유');
+  assert.equal(calls[1].payload.reason,'관리자 화면에서 수강 명단 등록');
 });
 test('clear invalidates both an open and a just-accepted confirmation before RPC',async()=>{
   for(const accept of [false,true]) {
@@ -166,7 +163,7 @@ test('stalled requests time out with a result-unconfirmed message and a usable r
   assert.equal(findButton(root,'새로고침').disabled,false);
   assert.ok(root.children.some(node=>node.focused));
 });
-test('approval requires an explicit cohort, reason, confirmation and revision; double clicks are blocked',async()=>{
+test('approval requires an explicit cohort, confirmation and revision while its audit reason is automatic',async()=>{
   const calls=[];
   let finish;
   const row={user_id:'fixture-id',revision:7,display_name:'예시 학생',canonical_gmail:'example@gmail.com',phone_last_four:'0000',roster_matches:[{id:12,cohort_id:2,cohort_name:'2기',display_name:'예시 학생',canonical_gmail:'example@gmail.com',phone_last_four:'0000',status:'eligible'}]};
@@ -181,16 +178,13 @@ test('approval requires an explicit cohort, reason, confirmation and revision; d
   assert.equal(calls.length,1);
   const select=root.querySelectorAll('select').find(node=>node.children.some(option=>String(option.textContent).includes('example@gmail.com')));
   select.value='12';select.selectedOptions=[{textContent:'2기 · 예시 학생 · example@gmail.com'}];
-  await approve.events.click(); assert.equal(calls.length,1);
-  const applicationRecord=root.querySelectorAll('tr').find(node=>textOf(node).includes('example@gmail.com'));
-  applicationRecord.querySelectorAll('input').find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='명단 확인';
   const pending=approve.events.click();
   await approve.events.click();
   assert.equal(calls.length,2);
   assert.equal(calls[1].action,'review');
   assert.equal(calls[1].payload.roster_entry_id,12);
   assert.equal(calls[1].payload.revision,7);
-  assert.equal(calls[1].payload.reason,'명단 확인');
+  assert.equal(calls[1].payload.reason,'관리자 화면에서 가입 승인');
   finish({error:{code:'40001'}}); await pending;
   assert.match(textOf(root),/다른 화면에서 이 정보가 바뀌었습니다/);
 });
@@ -249,13 +243,13 @@ test('direct roster entry is the first academy work card and keeps account appro
   inputs.find(node=>node.placeholder==='수강생 이름').value='테스트 학생';
   inputs.find(node=>node.placeholder==='아는 경우에만').value='Test.Student+academy';
   inputs.find(node=>node.placeholder==='끝 4자리').value='1234';
-  inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='신청서 대조';
   await findButton(direct,'수강 명단에 추가').events.click();
   assert.equal(calls[1].action,'roster_add');
   assert.equal(calls[1].payload.gmail_local_id,'test.student+academy');
   assert.equal(calls[1].payload.cohort_id,1);
   assert.equal(calls[1].payload.source_reference,'');
-  assert.equal(calls[1].payload.reason,'신청서 대조');
+  assert.equal(calls[1].payload.reason,'관리자 화면에서 수강 명단 등록');
+  assert.doesNotMatch(textOf(direct),/등록 사유/);
   // ★기수는 **왼쪽 기수 관리에서만** 고른다 — 같은 기수를 두 군데서 고르던 드롭다운은 없앴다
   //   (사용자 2026-09-14). 새 명단을 저장하면 그 기수로 자동 전환되는 계약은 그대로다.
   assert.equal(root.querySelectorAll('select').filter(node=>node.attrs['aria-label']==='등록 명단 기수 선택').length,0);
@@ -279,7 +273,6 @@ test('a roster row can be added without a Gmail — name + last four + cohort is
   const inputs=direct.querySelectorAll('input');
   inputs.find(node=>node.placeholder==='수강생 이름').value='김미가입';
   inputs.find(node=>node.placeholder==='끝 4자리').value='0402';
-  inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='엑셀 명단 대조';
   // Gmail 칸은 손대지 않는다.
   await findButton(direct,'수강 명단에 추가').events.click();
   const add=calls.find(c=>c.action==='roster_add');
@@ -307,10 +300,7 @@ test('the Excel roster reads name, last four and cohort — and says what it wil
   assert.match(parse(cohorts,{'이름':'홍길동','휴대폰 끝 4자리':'0402','기수':'유유스 9기'}).problem,/명단을 받지 않습니다/);
   assert.match(parse(cohorts,{'이름':'','휴대폰 끝 4자리':'0402','기수':'2기'}).problem,/이름이 비었습니다/);
 });
-test('a blocked add says why next to the button, not only at the top of the page',async()=>{
-  // ★2026-09-14 실사고: 사유를 비운 채 누르면 화면 맨 위 회색 문구로만 떠서 단추에서 318px
-  //   위였다. 「눌렀는데 아무 일도 안 난다」로 보였고, 그 시도는 서버까지 온 적이 없었다.
-  //   칸 이름은 「등록 사유」인데 오류는 「변경 사유」라고 달리 말하기까지 했다.
+test('direct roster add omits the unnecessary reason field but still sends an audit reason',async()=>{
   const calls=[];
   const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};
   const {root,admin}=setup(async(_name,args)=>{
@@ -324,17 +314,10 @@ test('a blocked add says why next to the button, not only at the top of the page
   const inputs=direct.querySelectorAll('input');
   inputs.find(node=>node.placeholder==='수강생 이름').value='시험학생';
   inputs.find(node=>node.placeholder==='끝 4자리').value='0402';
-  // 등록 사유를 비운 채로 누른다.
-  await findButton(direct,'수강 명단에 추가').events.click();
-  assert.equal(calls.filter(c=>c.action==='roster_add').length,0,'막혔으면 서버로 보내지 않는다');
-  const note=direct.querySelectorAll('p').find(node=>String(node.className).includes('academy-add-stop'));
-  assert.ok(note,'까닭은 카드 안에서도 보여야 한다 — 맨 위 문구만으로는 못 본다');
-  assert.match(note.textContent,/등록 사유/,'칸 이름과 같은 말을 쓴다');
-  assert.doesNotMatch(note.textContent,/변경 사유/);
-  // 채우면 통과한다.
-  inputs.find(node=>node.placeholder==='예: 수강 명단과 신청 정보를 확인함').value='명단 대조';
   await findButton(direct,'수강 명단에 추가').events.click();
   assert.equal(calls.filter(c=>c.action==='roster_add').length,1);
+  assert.equal(calls.find(c=>c.action==='roster_add').payload.reason,'관리자 화면에서 수강 명단 등록');
+  assert.doesNotMatch(textOf(direct),/등록 사유/);
 });
 test('only a cancelled roster row that never had an account can be deleted, and the reason is required',async()=>{
   // ★사용자 2026-09-14: 「취소된 명단도 삭제도 안되고」. 지울 수 있는 것은 취소된 줄 중
@@ -422,7 +405,7 @@ test('roster cohort filter stays beside the list and each row owns its edit and 
   await admin.load();
   // 왼쪽 기수 카드가 인원을 들고 있고, 누르면 오른쪽 명단이 그 기수만 보인다.
   const pickButtons=()=>root.querySelectorAll('button').filter(node=>/명단 (보기|접기)$/.test(String(node.attrs['aria-label']||'')));
-  assert.deepEqual(pickButtons().map(node=>node.textContent),['1명 명단 보기','1명 명단 보기']);
+  assert.deepEqual(pickButtons().map(node=>node.textContent),['1명 · 명단 보기','1명 · 명단 보기']);
   const listOf=()=>root.querySelectorAll('section').find(node=>String(node.className).includes('academy-roster-management'));
   assert.match(textOf(listOf()),/second@gmail\.com/);
   await pickButtons()[0].events.click();
@@ -485,6 +468,81 @@ test('sorting stays inside student management and the page-wide search toolbar i
   assert.equal(studentSection.querySelectorAll('article').length,0,'수강생을 카드로 되돌리면 안 된다');
   assert.doesNotMatch(textOf(root),/선택 승인|선택 정지|일괄 승인/);
 });
+test('academy account rows edit role and profile in one modal without changing the Gmail identity',async()=>{
+  const calls=[];
+  const accounts=[
+    {user_id:'admin-id',revision:2,display_name:'검증 관리자',canonical_gmail:'admin.check@gmail.com',phone_last_four:null,role:'admin',account_active:true,cohort_id:null,cohort_name:null,roster_options:[]},
+    {user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'student.check@gmail.com',phone_last_four:'0402',role:'student',account_active:true,cohort_id:1,cohort_name:'1기',roster_options:[]}
+  ];
+  const snapshot={...copy,accounts,cohorts:[{id:1,name:'1기',status:'active'}],totals:{accounts:2,applications:0,students:1,roster:1}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args); return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (2)'));
+  assert.deepEqual(section.querySelectorAll('th').map(node=>node.textContent),['','이메일','성함','끝 4자리','기수','역할','상태','관리']);
+  assert.match(textOf(section),/admin[.]check@gmail[.]com.*관리자.*student[.]check@gmail[.]com.*수강생/);
+  assert.doesNotMatch(textOf(section),/기수 변경/);
+  const studentRow=section.querySelectorAll('tr').find(node=>textOf(node).includes('student.check@gmail.com'));
+  findButton(studentRow,'수정').events.click();
+  const dialog=root.querySelectorAll('dialog')[0];
+  assert.match(textOf(dialog),/Gmail 주소와 비밀번호는 바꾸지 않습니다/);
+  const inputs=dialog.querySelectorAll('input');
+  const email=inputs.find(node=>node.type==='email');
+  assert.equal(email.value,'student.check@gmail.com'); assert.equal(email.readOnly,true);
+  inputs.find(node=>node.value==='검증 수강생').value='검증 코치';
+  inputs.find(node=>node.value==='0402').value='0402';
+  inputs.find(node=>node.placeholder==='예: 본인 요청으로 정보 정정').value='코치 배정';
+  const role=dialog.querySelectorAll('select')[0]; role.value='coach'; role.events.change();
+  const cohort=dialog.querySelectorAll('select')[1]; cohort.value='1';
+  await findButton(dialog,'저장').events.click();
+  assert.equal(calls[1].action,'account_update');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[1].payload)),{
+    user_id:'student-id',revision:4,display_name:'검증 코치',phone_last_four:'0402',role:'coach',reason:'코치 배정',cohort_id:1
+  });
+});
+test('academy account rows have left-side selection and one atomic bulk change command',async()=>{
+  const calls=[];
+  const accounts=[
+    {user_id:'student-a',revision:4,display_name:'가 학생',canonical_gmail:'a.student@gmail.com',phone_last_four:'1111',role:'student',account_active:true,cohort_name:'1기',can_be_student:true,roster_options:[]},
+    {user_id:'student-b',revision:7,display_name:'나 학생',canonical_gmail:'b.student@gmail.com',phone_last_four:'2222',role:'student',account_active:true,cohort_name:'1기',can_be_student:true,roster_options:[]}
+  ];
+  const snapshot={...copy,accounts,cohorts:[{id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'}],totals:{accounts:2,applications:0,students:2,roster:2}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args);return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (2)'));
+  const selectAll=section.querySelectorAll('input').find(node=>node.attrs['aria-label']==='현재 페이지 전체 선택');
+  assert.ok(selectAll);
+  assert.equal(section.querySelectorAll('input').filter(node=>String(node.attrs['aria-label']).endsWith('계정 선택')).length,2);
+  selectAll.checked=true; selectAll.events.change();
+  assert.match(textOf(section),/2명 선택/);
+  const role=section.querySelectorAll('select').find(node=>node.attrs['aria-label']==='선택 계정 역할 변경');
+  const cohort=section.querySelectorAll('select').find(node=>node.attrs['aria-label']==='선택 코치 담당 기수');
+  const status=section.querySelectorAll('select').find(node=>node.attrs['aria-label']==='선택 계정 이용 상태 변경');
+  role.value='coach'; role.events.change(); cohort.value='2'; status.value='suspended';
+  const pending=findButton(section,'일괄 적용').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.equal(calls[1].action,'account_bulk_update');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[1].payload)),{
+    accounts:[{user_id:'student-a',revision:4},{user_id:'student-b',revision:7}],
+    role:'coach',cohort_id:2,status:'suspended',reason:'관리자 화면에서 선택 계정 일괄 변경'
+  });
+});
+test('academy account actions expose edit, suspend and Academy-only delete with confirmation',async()=>{
+  const calls=[];
+  const account={user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'student.check@gmail.com',phone_last_four:'0402',role:'student',account_active:true,cohort_name:'1기',roster_options:[]};
+  const snapshot={...copy,accounts:[account],cohorts:[{id:1,name:'1기',status:'active'}],totals:{accounts:1,applications:0,students:1,roster:1}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args);return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  assert.ok(findButton(section,'수정')); assert.ok(findButton(section,'정지')); assert.ok(findButton(section,'삭제'));
+  const pending=findButton(section,'삭제').events.click();
+  const dialog=root.querySelectorAll('dialog')[0];
+  assert.match(textOf(dialog),/Gmail 계정과 다른 서비스 권한은 유지됩니다/);
+  findButton(dialog,'확인하고 적용').events.click();
+  await pending;
+  assert.equal(calls[1].action,'account_delete');
+  assert.equal(calls[1].payload.user_id,'student-id');
+});
 test('roster and cohort management use separate clear cards while cohort access stays explicit',async()=>{
   const snapshot={...copy,cohorts:[
     {id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:3,starts_on:null,ends_on:null},
@@ -500,10 +558,23 @@ test('roster and cohort management use separate clear cards while cohort access 
   assert.doesNotMatch(textOf(roster),/기수 관리|주소 코드|참조 번호/);
   assert.match(textOf(cohorts),/기수 관리.*수강생 입장 열림.*수강생 입장 닫힘.*수강생 입장 예정.*수강생 입장 기간 종료/);
   assert.match(textOf(cohorts),/운영 기간/);
+  assert.match(textOf(cohorts),/0명 · 명단 보기/);
+  const cohortCard=cohorts.querySelectorAll('article')[0];
+  const period=cohortCard.querySelectorAll('div').find(node=>String(node.className).includes('academy-meta-with-action'));
+  assert.match(textOf(period),/운영 기간.*0명 · 명단 보기/);
   assert.doesNotMatch(textOf(cohorts),/주소 코드|1기 · 유유스 1기/);
   assert.ok(findButton(cohorts,'입장 닫기'));
   assert.ok(findButton(cohorts,'입장 열기'));
   assert.doesNotMatch(textOf(cohorts),/운영 상태|명단 접수|보관/);
+});
+test('cohort badges use server totals instead of undercounting the visible roster page',async()=>{
+  const snapshot={...copy,cohorts:[
+    {id:1,cohort_number:1,name:'유유스 1기',status:'active',revision:1,roster_count:125}
+  ],roster:[{id:1,cohort_id:1,display_name:'현재 화면 한 명',canonical_gmail:null,phone_last_four:'1000',cohort_name:'유유스 1기',status:'eligible',revision:1}]};
+  const {root,admin}=setup(async()=>({data:snapshot}));
+  await admin.load();
+  assert.ok(findButton(root,'125명 · 명단 보기'));
+  assert.equal(findButton(root,'1명 · 명단 보기'),undefined);
 });
 test('an empty roster explains the next action and returns focus to direct entry',async()=>{
   const cohort={id:1,cohort_number:1,name:'유유스 1기',slug:'1gi',status:'active',revision:1,starts_on:null,ends_on:null};

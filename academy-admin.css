@@ -26,8 +26,7 @@
 .academy-admin .academy-card { background: var(--bg2, #111); border: 1px solid var(--border, #2a2a2a); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
 .academy-admin .academy-management-card > .academy-notice { margin-top: -8px; }
 .academy-admin .academy-roster-add { margin-top: 20px; }
-.academy-admin .academy-roster-add .academy-fields { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(140px, .9fr) minmax(220px, 1.25fr) minmax(150px, .8fr); align-items: end; }
-.academy-admin .academy-roster-add .academy-fields label:last-child { grid-column: 1 / -1; }
+.academy-admin .academy-roster-add .academy-fields { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(140px, .9fr) minmax(150px, .8fr) minmax(220px, 1.25fr); align-items: end; }
 .academy-admin .academy-roster-management { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border, #2a2a2a); }
 .academy-admin .academy-roster-management > .academy-disclosure { margin-top: 16px; }
 .academy-admin .academy-roster-controls { display: flex; flex: none; align-items: flex-end; gap: 8px; }
@@ -59,6 +58,8 @@
 .academy-admin .academy-meta-item { min-width: 0; }
 .academy-admin .academy-meta-item dt { margin-bottom: 3px; color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-meta-item dd { margin: 0; color: var(--text, #e8e8e8); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.academy-admin .academy-meta-with-action dd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.academy-admin .academy-meta-with-action .btn { flex: none; min-height: 32px; padding: 5px 9px; }
 .academy-admin .academy-roster-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-empty-state { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px dashed var(--border, #2a2a2a); border-radius: 10px; background: rgba(255, 255, 255, .02); }
 .academy-admin .academy-empty-state strong { display: block; margin-bottom: 4px; color: var(--text, #e8e8e8); font-size: 14px; }
@@ -116,6 +117,29 @@
 .academy-admin .academy-table .academy-disclosure { margin-top: 0; border-top: 0; }
 .academy-admin .academy-table .academy-disclosure summary { min-height: 0; padding: 2px 22px 2px 0; }
 .academy-admin .badge-suspended { background: rgba(255, 152, 0, .15); color: #ff9800; }
+.academy-admin .academy-role { border: 1px solid var(--border, #2a2a2a); background: rgba(255,255,255,.04); color: var(--text, #e8e8e8); }
+.academy-admin .academy-role-admin { border-color: rgba(255,215,0,.45); color: var(--accent, #ffd700); }
+.academy-admin .academy-role-coach { border-color: rgba(80,160,255,.45); color: #8fc5ff; }
+.academy-admin .academy-account-actions .btn { min-width: 0; padding-inline: 10px; }
+.academy-admin .academy-select-cell { width: 42px; min-width: 42px; text-align: center; }
+.academy-admin .academy-select-cell input[type="checkbox"] { width: 18px; min-height: 18px; margin: 0; padding: 0; accent-color: var(--accent, #ffd700); }
+.academy-admin .academy-account-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 12px; padding: 12px; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; background: var(--bg3, #1a1a1a); }
+.academy-admin .academy-account-bulk-count { min-width: 72px; color: var(--accent, #ffd700); font-size: 13px; }
+.academy-admin .academy-account-bulk select { width: auto; min-width: 138px; min-height: 36px; padding: 7px 10px; }
+.academy-admin .academy-account-bulk select[hidden] { display: none; }
+.academy-admin .academy-account-bulk .btn { min-height: 36px; }
+.academy-admin .academy-account-dialog { width: min(620px, calc(100% - 32px)); }
+.academy-admin .academy-account-dialog > h3 { color: var(--text, #e8e8e8); font-size: 20px; }
+.academy-admin .academy-account-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0 12px; }
+.academy-admin .academy-account-form > label:first-child,
+.academy-admin .academy-account-scope,
+.academy-admin .academy-account-form > label:last-child { grid-column: 1 / -1; }
+.academy-admin .academy-account-form label { min-width: 0; }
+.academy-admin .academy-account-form input[readonly] { color: var(--text2, #b0b0b0); background: rgba(255,255,255,.035); cursor: not-allowed; }
+.academy-admin .academy-account-scope > label[hidden] { display: none; }
+.academy-admin .academy-account-guidance { min-height: 21px; margin-bottom: 4px; }
+.academy-admin .academy-account-dialog-actions { justify-content: flex-end; margin-top: 18px; }
+.academy-admin .academy-account-dialog-actions .btn { min-width: 72px; }
 
 /* ★준비 단계 두 카드는 늘 같이 본다 — 기수를 만들고 그 기수에 명단을 넣는다.
    명단 쪽이 넓어야 하므로 1 : 1.45 로 준다 (사용자 2026-09-14). */
@@ -144,7 +168,6 @@
 .academy-admin .academy-roster-filter input { min-height: 36px; }
 
 /* 고른 기수는 눈에 보여야 한다 — 오른쪽 명단이 그 기수만 보이고 있다는 뜻이다. */
-.academy-admin .academy-cohort-card > .btn { width: 100%; margin-top: 10px; justify-content: center; }
 .academy-admin .academy-cohort-picked { border-color: var(--accent, #ffd700); background: rgba(255, 215, 0, .05); }
 
 @media (max-width: 720px) {
@@ -154,7 +177,6 @@
   .academy-admin .academy-student-sort-label { flex-basis: 100%; }
   .academy-admin .academy-fields { display: grid; grid-template-columns: 1fr; }
   .academy-admin .academy-roster-add .academy-fields { grid-template-columns: 1fr; }
-  .academy-admin .academy-roster-add .academy-fields label:last-child { grid-column: auto; }
   .academy-admin label { min-width: 0; }
   .academy-admin input, .academy-admin select { font-size: 16px; }
   .academy-admin .academy-card { padding: 16px; }
@@ -172,6 +194,17 @@
   .academy-admin .btn { min-height: 44px; }
   .academy-admin .academy-actions { display: grid; grid-template-columns: 1fr; }
   .academy-admin .academy-record .btn { width: 100%; justify-content: center; }
+  .academy-admin .academy-account-form { grid-template-columns: 1fr; }
+  .academy-admin .academy-account-form > label:first-child,
+  .academy-admin .academy-account-scope,
+  .academy-admin .academy-account-form > label:last-child { grid-column: auto; }
+  .academy-admin .academy-account-dialog-actions { display: flex; }
+  .academy-admin .academy-account-dialog-actions .btn { flex: 1; width: auto; }
+  .academy-admin .academy-account-bulk { align-items: stretch; }
+  .academy-admin .academy-account-bulk-count { flex-basis: 100%; }
+  .academy-admin .academy-account-bulk select,
+  .academy-admin .academy-account-bulk .btn { flex: 1 1 150px; width: 100%; }
+  .academy-admin .academy-meta-with-action dd { align-items: flex-start; flex-direction: column; }
 }
 
 .academy-admin .academy-confirm { margin: auto; width: min(480px, calc(100% - 32px)); box-sizing: border-box; max-height: 85dvh; overflow: auto; padding: 24px; border: 1px solid var(--border, #555); border-radius: 12px; background: var(--bg-card, #202020); color: var(--text, #f5f5f5); }
