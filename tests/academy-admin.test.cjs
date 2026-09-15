@@ -476,7 +476,7 @@ test('sorting stays inside student management and the page-wide search toolbar i
   assert.equal(studentSection.querySelectorAll('article').length,0,'수강생을 카드로 되돌리면 안 된다');
   assert.doesNotMatch(textOf(root),/선택 승인|선택 정지|일괄 승인/);
 });
-test('academy account rows edit role and profile in one modal without changing the Gmail identity',async()=>{
+test('academy account rows edit role and profile without a reason field, then ask once before saving',async()=>{
   const calls=[];
   const accounts=[
     {user_id:'admin-id',revision:2,display_name:'검증 관리자',canonical_gmail:'admin.check@gmail.com',phone_last_four:null,role:'admin',account_active:true,cohort_id:null,cohort_name:null,roster_options:[]},
@@ -498,14 +498,163 @@ test('academy account rows edit role and profile in one modal without changing t
   assert.equal(email.value,'student.check@gmail.com'); assert.equal(email.readOnly,true);
   inputs.find(node=>node.value==='검증 수강생').value='검증 코치';
   inputs.find(node=>node.value==='0402').value='0402';
-  inputs.find(node=>node.placeholder==='예: 본인 요청으로 정보 정정').value='코치 배정';
+  assert.doesNotMatch(textOf(dialog),/수정 사유|\(필수\)/);
   const role=dialog.querySelectorAll('select')[0]; role.value='coach'; role.events.change();
   const cohort=dialog.querySelectorAll('select')[1]; cohort.value='1';
-  await findButton(dialog,'저장').events.click();
+  const pending=findButton(dialog,'저장').events.click();
+  assert.equal(calls.length,1,'확인 전에는 저장하지 않는다');
+  const confirmation=root.querySelectorAll('dialog')[1];
+  assert.match(textOf(confirmation),/검증 코치 계정 정보를 저장할까요/);
+  findButton(confirmation,'확인하고 적용').events.click();
+  await pending;
   assert.equal(calls[1].action,'account_update');
   assert.deepEqual(JSON.parse(JSON.stringify(calls[1].payload)),{
-    user_id:'student-id',revision:4,display_name:'검증 코치',phone_last_four:'0402',role:'coach',reason:'코치 배정',cohort_id:1
+    user_id:'student-id',revision:4,display_name:'검증 코치',phone_last_four:'0402',role:'coach',reason:'관리자 화면에서 계정 정보 수정',cohort_id:1
   });
+});
+test('a student cohort can be corrected from the account editor even when no matching roster row exists',async()=>{
+  const calls=[];
+  const account={user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'raion.log@gmail.com',phone_last_four:'0402',role:'student',account_active:true,cohort_id:1,cohort_name:'1기',roster_options:[]};
+  const snapshot={...copy,accounts:[account],cohorts:[
+    {id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'},{id:3,name:'준비 3기',status:'enrollment'},
+    {id:4,name:'종료 4기',status:'active',ends_on:'2020-01-01'}
+  ],totals:{accounts:1,applications:0,students:1,roster:1}};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    if(args.action==='admin_snapshot') return {data:snapshot};
+    if(args.action==='roster_add') return {data:{ok:true,roster_entry_id:82}};
+    return {data:{ok:true}};
+  },null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  findButton(section,'수정').events.click();
+  const editor=root.querySelectorAll('dialog')[0];
+  editor.querySelectorAll('input').find(node=>node.value==='검증 수강생').value='정정 수강생';
+  const selects=editor.querySelectorAll('select');
+  const studentCohort=selects[2];
+  assert.deepEqual(studentCohort.children.map(option=>option.textContent),['수강 기수 선택','1기','2기']);
+  assert.equal(studentCohort.value,'1');
+  studentCohort.value='2'; studentCohort.selectedOptions=[{textContent:'2기'}];
+
+  const cancelled=findButton(editor,'저장').events.click();
+  assert.match(textOf(root.querySelectorAll('dialog')[1]),/수강 기수: 2기/);
+  findButton(root,'취소하고 돌아가기').events.click();
+  await cancelled;
+  assert.equal(calls.length,1,'확인 취소 시 명단과 계정을 모두 그대로 둔다');
+  assert.equal(root.querySelectorAll('dialog').length,1,'취소하면 입력한 수정창으로 돌아간다');
+
+  const pending=findButton(editor,'저장').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.equal(calls[1].action,'roster_add');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[1].payload)),{
+    cohort_id:2,gmail_local_id:'raion.log',display_name:'검증 수강생',phone_last_four:'0402',source_reference:'',reason:'관리자 화면에서 계정 기수 정정'
+  });
+  assert.equal(calls[2].action,'account_update');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[2].payload)),{
+    user_id:'student-id',revision:4,display_name:'정정 수강생',phone_last_four:'0402',role:'student',reason:'관리자 화면에서 계정 정보 수정',roster_entry_id:82
+  });
+});
+test('student cohort correction reuses an eligible matching roster row',async()=>{
+  const calls=[];
+  const account={user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'student.check@gmail.com',phone_last_four:'0402',role:'student',account_active:true,cohort_id:1,cohort_name:'1기',
+    roster_options:[{id:91,cohort_id:2,cohort_name:'2기',status:'eligible'}]};
+  const snapshot={...copy,accounts:[account],cohorts:[{id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'}],totals:{accounts:1,applications:0,students:1,roster:2}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args);return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  findButton(section,'수정').events.click();
+  const editor=root.querySelectorAll('dialog')[0];
+  const cohort=editor.querySelectorAll('select')[2]; cohort.value='2'; cohort.selectedOptions=[{textContent:'2기'}];
+  const pending=findButton(editor,'저장').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.equal(calls.filter(call=>call.action==='roster_add').length,0);
+  assert.equal(calls[1].action,'account_update');
+  assert.equal(calls[1].payload.roster_entry_id,91);
+});
+test('switching a coach back to student always assigns the cohort chosen in the editor',async()=>{
+  const calls=[];
+  const account={user_id:'coach-id',revision:6,display_name:'검증 코치',canonical_gmail:'coach.check@gmail.com',phone_last_four:'0402',role:'coach',account_active:true,cohort_id:1,cohort_name:'1기',can_be_student:true,
+    roster_options:[{id:92,cohort_id:1,cohort_name:'1기',status:'eligible'}]};
+  const snapshot={...copy,accounts:[account],cohorts:[{id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'}],totals:{accounts:1,applications:0,students:1,roster:2}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args);return args.action==='admin_snapshot'?{data:snapshot}:{data:{ok:true}};},null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  findButton(section,'수정').events.click();
+  const editor=root.querySelectorAll('dialog')[0];
+  const selects=editor.querySelectorAll('select');
+  selects[0].value='student'; selects[0].events.change();
+  selects[2].value='1'; selects[2].selectedOptions=[{textContent:'1기'}];
+  const pending=findButton(editor,'저장').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.equal(calls[1].action,'account_update');
+  assert.equal(calls[1].payload.role,'student');
+  assert.equal(calls[1].payload.roster_entry_id,92,'코치 담당 기수와 같아도 수강생 현재 기수 배정을 생략하면 안 된다');
+});
+test('a prepared cohort roster reloads the latest account when the second write cannot be confirmed',async()=>{
+  const calls=[];
+  const account={user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'student.check@gmail.com',phone_last_four:'0402',role:'student',account_active:true,cohort_id:1,cohort_name:'1기',roster_options:[]};
+  const snapshot={...copy,accounts:[account],cohorts:[{id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'}],totals:{accounts:1,applications:0,students:1,roster:1}};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    if(args.action==='admin_snapshot') return {data:snapshot};
+    if(args.action==='roster_add') return {data:{ok:true,roster_entry_id:82}};
+    return {error:new Error('academy_stale_record')};
+  },null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  findButton(section,'수정').events.click();
+  const editor=root.querySelectorAll('dialog')[0];
+  const cohort=editor.querySelectorAll('select')[2]; cohort.value='2'; cohort.selectedOptions=[{textContent:'2기'}];
+  const pending=findButton(editor,'저장').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.deepEqual(calls.map(call=>call.action),['admin_snapshot','roster_add','account_update','admin_snapshot']);
+  assert.match(textOf(root),/새 기수 명단을 준비했습니다.*최신 목록을 다시 불러왔습니다/);
+  assert.equal(root.querySelectorAll('dialog').length,0);
+});
+test('an unconfirmed roster creation reloads before the administrator can retry',async()=>{
+  const calls=[];
+  const account={user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'student.check@gmail.com',phone_last_four:'0402',role:'student',account_active:true,cohort_id:1,cohort_name:'1기',roster_options:[]};
+  const snapshot={...copy,accounts:[account],cohorts:[{id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'}],totals:{accounts:1,applications:0,students:1,roster:1}};
+  const {root,admin}=setup(async(_name,args)=>{
+    calls.push(args);
+    return args.action==='admin_snapshot' ? {data:snapshot} : {error:new Error('result_unconfirmed')};
+  },null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  findButton(section,'수정').events.click();
+  const editor=root.querySelectorAll('dialog')[0];
+  const cohort=editor.querySelectorAll('select')[2]; cohort.value='2'; cohort.selectedOptions=[{textContent:'2기'}];
+  const pending=findButton(editor,'저장').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.deepEqual(calls.map(call=>call.action),['admin_snapshot','roster_add','admin_snapshot']);
+  assert.match(textOf(root),/기수 명단 처리 결과를 확인하기 위해 최신 목록을 다시 불러왔습니다/);
+  assert.equal(root.querySelectorAll('dialog').length,0);
+});
+test('a suspended student sees the current cohort only and edit errors stay inside the dialog',async()=>{
+  const calls=[];
+  const account={user_id:'student-id',revision:4,display_name:'검증 수강생',canonical_gmail:'student.check@gmail.com',phone_last_four:'0402',role:'student',account_active:false,cohort_id:1,cohort_name:'1기',roster_options:[]};
+  const snapshot={...copy,accounts:[account],cohorts:[{id:1,name:'1기',status:'active'},{id:2,name:'2기',status:'active'}],totals:{accounts:1,applications:0,students:1,roster:1}};
+  const {root,admin}=setup(async(_name,args)=>{calls.push(args);return args.action==='admin_snapshot'?{data:snapshot}:{error:{code:'40001'}};},null);
+  await admin.load();
+  const section=root.querySelectorAll('section').find(node=>textOf(node).includes('수강생 계정 관리 (1)'));
+  findButton(section,'수정').events.click();
+  const editor=root.querySelectorAll('dialog')[0];
+  const cohort=editor.querySelectorAll('select')[2];
+  assert.deepEqual(cohort.children.map(option=>option.textContent),['수강 기수 선택','1기']);
+  assert.match(textOf(editor),/먼저 이용 재개 후 기수를 바꿀 수 있습니다/);
+  const pending=findButton(editor,'저장').events.click();
+  findButton(root,'확인하고 적용').events.click();
+  await pending;
+  assert.equal(root.querySelectorAll('dialog').length,1);
+  const feedback=editor.querySelectorAll('p').find(node=>String(node.className).includes('academy-account-feedback'));
+  assert.match(feedback.textContent,/다른 화면에서 이 정보가 바뀌었습니다/);
+  assert.equal(feedback.attrs.role,'alert');
+  assert.equal(feedback.focused,true);
 });
 test('academy account rows have left-side selection and one atomic bulk change command',async()=>{
   const calls=[];

@@ -176,19 +176,39 @@
         if (token === epoch) { message(errorMessage(error), true); disabled(false); status.focus(); }
       } finally { if (token === epoch) busy = false; }
     }
-    async function applyAccountChange(action, payload, successMessage) {
+    async function applyAccountChange(action, payload, successMessage, confirmation, preparePayload, errorTarget) {
       if (busy) return false;
+      const confirmationEpoch = epoch;
+      if (confirmation && (!await confirmChange(confirmation) || confirmationEpoch !== epoch)) return false;
       busy = true; disabled(true); message('계정 정보를 적용하고 있습니다. 창을 닫지 마세요.');
       const token = epoch;
+      let recoveryMessage = '';
       try {
-        const { data, error } = await request(action, payload);
+        const preparation = preparePayload
+          ? await preparePayload(payload, text => { recoveryMessage = text; })
+          : payload;
+        const prepared = preparation?.payload || preparation;
+        recoveryMessage = preparation?.recoveryMessage || '';
+        if (token !== epoch) return false;
+        const { data, error } = await request(action, prepared);
         if (token !== epoch) return false;
         if (error || data?.ok !== true) throw error || new Error('invalid_response');
         busy = false;
         await load(successMessage);
         return true;
       } catch (error) {
-        if (token === epoch) { message(errorMessage(error), true); disabled(false); status.focus(); }
+        if (token === epoch && recoveryMessage) {
+          busy = false;
+          await load(recoveryMessage);
+        } else if (token === epoch) {
+          const text = errorMessage(error);
+          if (errorTarget) {
+            errorTarget.setAttribute('role', 'alert');
+            errorTarget.textContent = text;
+            disabled(false);
+            errorTarget.focus();
+          } else { message(text, true); disabled(false); status.focus(); }
+        }
         return false;
       } finally { if (token === epoch) busy = false; }
     }
@@ -477,39 +497,50 @@
         dialog.setAttribute('aria-labelledby', `academy-account-title-${row.user_id}`);
         const title = el('h3', '계정 정보 수정'); title.id = `academy-account-title-${row.user_id}`;
         const email = input('email'); email.value = row.canonical_gmail || ''; email.readOnly = true;
-        const name = input('text'); name.value = row.display_name || ''; name.required = true; name.maxLength = 40;
+        const name = input('text'); name.value = row.display_name || ''; name.maxLength = 40;
         const phone = input('text'); phone.value = row.phone_last_four || ''; phone.inputMode = 'numeric'; phone.maxLength = 4;
-        const role = el('select'); role.required = true;
+        const role = el('select');
         for (const [value, label] of Object.entries(roleLabels)) {
           const option = el('option', value === 'student' && row.can_be_student === false ? `${label} (명단 연결 필요)` : label);
           option.value = value; option.selected = row.role === value;
           option.disabled = (value === 'student' && row.can_be_student === false) || (row.role === 'admin' && row.account_active && activeAdminCount <= 1 && value !== 'admin');
           role.appendChild(option);
         }
+        role.value = row.role;
         const coachCohort = cohortField(cohorts.filter(item => item.status !== 'archived'));
+        coachCohort.required = false;
         coachCohort.value = row.role === 'coach' && row.cohort_id ? String(row.cohort_id) : '';
-        const studentRoster = rosterField(Array.isArray(row.roster_options) ? row.roster_options : []);
-        studentRoster.children[0].textContent = '현재 기수 유지';
-        studentRoster.value = '';
+        const today = seoulDateKey();
+        const studentCohorts = cohorts.filter(item =>
+          Number(item.id) === Number(row.cohort_id) || (row.account_active !== false && item.status === 'active' &&
+            (!item.starts_on || item.starts_on <= today) && (!item.ends_on || item.ends_on >= today)));
+        const studentCohort = cohortField(studentCohorts);
+        studentCohort.required = false;
+        studentCohort.children[0].textContent = '수강 기수 선택';
+        studentCohort.value = row.role === 'student' && row.cohort_id ? String(row.cohort_id) : '';
         const scopeFields = el('div', undefined, 'academy-account-scope');
         const coachField = field('담당 기수', coachCohort);
-        const studentField = field('수강 기수', studentRoster);
+        const studentField = field('수강 기수', studentCohort);
         scopeFields.append(coachField, studentField);
-        const reason = reasonField(); reason.placeholder = '예: 본인 요청으로 정보 정정';
         const form = el('form', undefined, 'academy-account-form');
-        form.append(field('Gmail 계정', email), field('이름', name), field('휴대폰 끝 4자리', phone), field('역할', role), scopeFields, field('수정 사유', reason));
+        form.append(field('Gmail 계정', email), field('이름', name), field('휴대폰 끝 4자리', phone), field('역할', role), scopeFields);
         const guidance = el('p', '', 'academy-notice academy-account-guidance');
+        const feedback = el('p', '', 'academy-status academy-account-feedback');
+        feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); feedback.tabIndex = -1;
+        const report = (text, target) => {
+          feedback.setAttribute('role', 'alert'); feedback.textContent = text;
+          if (target) target.focus(); else feedback.focus();
+        };
         const syncScope = () => {
           coachField.hidden = role.value !== 'coach';
           studentField.hidden = role.value !== 'student';
-          coachCohort.required = role.value === 'coach';
-          studentRoster.required = false;
-          phone.required = role.value === 'student' || Boolean(row.phone_last_four);
           guidance.textContent = role.value === 'coach'
             ? '코치는 지정한 기수의 질문 큐만 확인합니다.'
             : role.value === 'admin'
               ? '관리자는 명단·역할·운영 전체를 관리합니다.'
-              : '수강생은 배정된 현재 기수 학습실만 이용합니다.';
+              : row.account_active === false
+                ? '이용 정지 계정은 먼저 이용 재개 후 기수를 바꿀 수 있습니다.'
+                : '수강생은 배정된 현재 기수 학습실만 이용합니다.';
         };
         role.addEventListener('change', syncScope); syncScope();
         let closed = false;
@@ -524,22 +555,48 @@
         const save = button('저장', async () => {
           const cleanName = name.value.trim().replace(/\s+/g, ' ');
           const cleanPhone = phone.value.trim();
-          if (cleanName.length < 2 || cleanName.length > 40) { message('이름을 2~40자로 입력해주세요.', true); name.focus(); return; }
-          if ((role.value === 'student' || cleanPhone) && !/^\d{4}$/.test(cleanPhone)) { message('휴대폰 끝 4자리를 숫자로 입력해주세요.', true); phone.focus(); return; }
-          if (role.value === 'coach' && !coachCohort.value) { message('코치가 담당할 기수를 선택해주세요.', true); coachCohort.focus(); return; }
-          if (!reason.value.trim()) { message('수정 사유를 입력해주세요.', true); reason.focus(); return; }
+          feedback.textContent = ''; feedback.setAttribute('role', 'status');
+          if (cleanName.length < 2 || cleanName.length > 40) { report('이름을 2~40자로 입력해주세요.', name); return; }
+          if ((role.value === 'student' || cleanPhone) && !/^\d{4}$/.test(cleanPhone)) { report('휴대폰 끝 4자리를 숫자로 입력해주세요.', phone); return; }
+          if (role.value === 'coach' && !coachCohort.value) { report('코치가 담당할 기수를 선택해주세요.', coachCohort); return; }
+          if (role.value === 'student' && !studentCohort.value) { report('수강 기수를 선택해주세요.', studentCohort); return; }
+          const selectedCohort = role.value === 'student'
+            ? (studentCohort.selectedOptions?.[0] || [...studentCohort.children].find(option => option.value === studentCohort.value))?.textContent
+            : '';
           const payload = {
             user_id: row.user_id, revision: row.revision, display_name: cleanName,
-            phone_last_four: cleanPhone, role: role.value, reason: reason.value.trim()
+            phone_last_four: cleanPhone, role: role.value, reason: '관리자 화면에서 계정 정보 수정'
           };
           if (role.value === 'coach') payload.cohort_id = Number(coachCohort.value);
-          if (role.value === 'student' && studentRoster.value) payload.roster_entry_id = Number(studentRoster.value);
-          close();
-          await applyAccountChange('account_update', payload, `${cleanName} 계정 정보를 저장했습니다.`);
+          const targetCohort = role.value === 'student' ? Number(studentCohort.value) : null;
+          const confirmation = `${cleanName} 계정 정보를 저장할까요?` +
+            (role.value === 'student' ? `\n수강 기수: ${selectedCohort}` : '');
+          const prepare = role.value === 'student' && (row.role !== 'student' || targetCohort !== Number(row.cohort_id))
+            ? async (values, setRecovery) => {
+                setRecovery('기수 명단 처리 결과를 확인하기 위해 최신 목록을 다시 불러왔습니다. 다시 수정해주세요.');
+                const existing = (Array.isArray(row.roster_options) ? row.roster_options : [])
+                  .find(item => Number(item.cohort_id) === targetCohort);
+                if (existing) return { ...values, roster_entry_id: Number(existing.id) };
+                const gmailLocal = String(row.canonical_gmail || '').replace(/@gmail[.]com$/i, '');
+                const { data, error } = await request('roster_add', {
+                  cohort_id: targetCohort, gmail_local_id: gmailLocal, display_name: row.display_name,
+                  phone_last_four: row.phone_last_four, source_reference: '',
+                  reason: '관리자 화면에서 계정 기수 정정'
+                });
+                if (error || data?.ok !== true || !Number(data.roster_entry_id)) throw error || new Error('invalid_response');
+                return {
+                  payload: { ...values, roster_entry_id: Number(data.roster_entry_id) },
+                  recoveryMessage: '새 기수 명단을 준비했습니다. 계정 저장 결과를 확인하지 못해 최신 목록을 다시 불러왔습니다. 다시 수정해주세요.'
+                };
+              }
+            : null;
+          const saved = await applyAccountChange('account_update', payload,
+            `${cleanName} 계정 정보를 저장했습니다.`, confirmation, prepare, feedback);
+          if (saved) close();
         }, 'primary');
         const actions = el('div', undefined, 'academy-actions academy-account-dialog-actions');
         actions.append(cancel, save);
-        dialog.append(title, el('p', '저장하면 유유스 접근 권한에 바로 반영됩니다. Gmail 주소와 비밀번호는 바꾸지 않습니다.', 'academy-notice'), form, guidance,
+        dialog.append(title, el('p', '저장하면 유유스 접근 권한에 바로 반영됩니다. Gmail 주소와 비밀번호는 바꾸지 않습니다.', 'academy-notice'), form, guidance, feedback,
           historyDisclosure(row.user_id, audit), actions);
         dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
         root.appendChild(dialog);
