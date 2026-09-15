@@ -8,7 +8,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="academy-admin.css?v=20260915-14">
+  <link rel="stylesheet" href="academy-admin.css?v=20260915-15">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -944,7 +944,7 @@
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-  <script src="academy-admin.js?v=20260915-14"></script>
+  <script src="academy-admin.js?v=20260915-15"></script>
   <script>
     // ========== Supabase 설정 ==========
     // service_role 키는 제거됨. 브라우저에는 공개키(anon)만 두고,
@@ -959,9 +959,17 @@
     let accessToken = null;   // 로그인 후 채워짐
     const academyAdmin = window.createAcademyAdmin(sb, document.getElementById('tab-academy'));
     let academyIdentity = null;
+    let displayedAdminIdentity = null;
+    let adminCheckEpoch = 0;
     function syncAcademyIdentity(session) {
       const nextIdentity = session?.user?.id || null;
-      if (nextIdentity !== academyIdentity || !nextIdentity) academyAdmin.clear();
+      if (nextIdentity !== academyIdentity || !nextIdentity) {
+        academyAdmin.clear();
+        displayedAdminIdentity = null;
+        adminCheckEpoch++;
+        document.getElementById('app-root').classList.add('hidden');
+        document.getElementById('auth-gate').classList.remove('hidden');
+      }
       academyIdentity = nextIdentity;
     }
     let currentAdmin = null;  // { email, name }
@@ -2202,6 +2210,8 @@
     async function checkAdmin(session) {
       syncAcademyIdentity(session);
       accessToken = session.access_token;
+      const checkEpoch = ++adminCheckEpoch;
+      const identity = session.user?.id;
       const email = session.user && session.user.email;
       if (!email) { gateMessage('계정에서 이메일을 확인할 수 없습니다.', true); return; }
 
@@ -2212,6 +2222,13 @@
         .eq('email', email)
         .maybeSingle();
 
+      if (checkEpoch !== adminCheckEpoch || identity !== academyIdentity) return;
+      if (error || !data || data.role !== 'admin') {
+        displayedAdminIdentity = null;
+        academyAdmin.clear();
+        document.getElementById('app-root').classList.add('hidden');
+        gateEl.classList.remove('hidden');
+      }
       if (error) {
         gateMessage('권한 확인 실패: ' + error.message, true);
         gateLogout.classList.remove('hidden');
@@ -2232,7 +2249,11 @@
       document.getElementById('admin-email').textContent = email;
       gateEl.classList.add('hidden');
       document.getElementById('app-root').classList.remove('hidden');
-      restoreLastTab();   // 늘 '확장프로그램'으로 돌아가지 않고, 보던 탭으로
+      // Chrome 복귀의 SIGNED_IN 재확인은 권한만 확인하고 현재 화면은 유지한다.
+      if (displayedAdminIdentity !== identity) {
+        displayedAdminIdentity = identity;
+        restoreLastTab();
+      }
     }
 
     document.getElementById('gate-login').addEventListener('click', async () => {
@@ -2278,7 +2299,12 @@
 
     sb.auth.onAuthStateChange((event, session) => {
       syncAcademyIdentity(session);
-      if (event === 'SIGNED_IN' && session) checkAdmin(session);
+      accessToken = session?.access_token || null;
+      if (event === 'SIGNED_IN' && session) {
+        // Auth 콜백의 내부 잠금 밖에서 권한 조회를 실행한다.
+        const identity = session.user.id;
+        setTimeout(() => { if (academyIdentity === identity) checkAdmin(session); }, 0);
+      }
     });
 
     // ========== UV 에디터 (uv-global-reaction-editor 앱 회원) ==========

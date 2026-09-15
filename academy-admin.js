@@ -431,13 +431,13 @@
       const bulkBar = el('div', undefined, 'academy-account-bulk');
       const selectedCount = el('strong', '0명 선택', 'academy-account-bulk-count');
       const bulkRole = el('select'); bulkRole.setAttribute('aria-label', '선택 계정 역할 변경');
-      for (const [value,label] of [['','역할 유지'],['student','수강생으로'],['coach','코치로'],['admin','관리자로']]) {
+      for (const [value,label] of [['','역할'],['student','수강생으로'],['coach','코치로'],['admin','관리자로']]) {
         const option = el('option',label); option.value=value; bulkRole.appendChild(option);
       }
       const bulkCohort = cohortField(cohorts.filter(item => item.status !== 'archived'));
       bulkCohort.required = false; bulkCohort.setAttribute('aria-label','선택 코치 담당 기수'); bulkCohort.hidden = true;
       const bulkStatus = el('select'); bulkStatus.setAttribute('aria-label','선택 계정 이용 상태 변경');
-      for (const [value,label] of [['','상태 유지'],['active','이용 재개'],['suspended','이용 정지']]) {
+      for (const [value,label] of [['','상태'],['active','이용 재개'],['suspended','이용 정지']]) {
         const option = el('option',label); option.value=value; bulkStatus.appendChild(option);
       }
       const bulkApply = button('일괄 적용', () => {
