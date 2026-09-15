@@ -58,7 +58,7 @@
 .academy-admin .academy-meta-item { min-width: 0; }
 .academy-admin .academy-meta-item dt { margin-bottom: 3px; color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-meta-item dd { margin: 0; color: var(--text, #e8e8e8); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.academy-admin .academy-meta-with-action dd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.academy-admin .academy-meta-with-action dt { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .academy-admin .academy-meta-with-action .btn { flex: none; min-height: 32px; padding: 5px 9px; }
 .academy-admin .academy-roster-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; color: var(--text2, #b0b0b0); font-size: 12px; }
 .academy-admin .academy-empty-state { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px dashed var(--border, #2a2a2a); border-radius: 10px; background: rgba(255, 255, 255, .02); }

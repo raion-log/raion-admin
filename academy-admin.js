@@ -678,7 +678,7 @@
         const meta=el('dl',undefined,'academy-cohort-meta');
         const period=metaItem('운영 기간',`${row.starts_on || '시작일 미정'} ~ ${row.ends_on || '종료일 미정'}`);
         period.className += ' academy-meta-with-action';
-        period.children[1].appendChild(pick);
+        period.children[0].appendChild(pick);
         meta.append(period);
         card.append(cardHeading,meta);
         const changeReason=reasonField();
